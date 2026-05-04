@@ -148,7 +148,7 @@ pub fn restart_hyprlock_only(quiet: bool) -> Result<()> {
         return run_command("omarchy-restart-hyprlock", &[], quiet);
     }
 
-    // Omarchy currently provides `omarchy-lock-screen` and launches hyprlock on demand,
+    // Omarchy currently provides `omarchy-system-lock` and launches hyprlock on demand,
     // but does not ship a dedicated restart helper on all installs.
     let _ = quiet;
     Ok(())
