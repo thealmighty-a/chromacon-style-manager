@@ -7,16 +7,18 @@ pub mod git_ops;
 pub mod hyprlock;
 pub mod omarchy;
 pub mod omarchy_defaults;
+pub mod output;
 pub mod paths;
 pub mod presets;
 pub mod preview;
 pub mod starship;
 pub mod theme_ops;
 pub mod tui;
+pub mod unlock;
 pub mod walker;
 pub mod waybar;
 
-use cli::{Command, PresetCommand};
+use cli::{Command, PresetCommand, UnlockCommand};
 use config::ResolvedConfig;
 use theme_ops::{
     hyprlock_from_defaults, starship_from_defaults, walker_from_defaults, waybar_from_defaults,
@@ -86,6 +88,10 @@ pub fn run(cli: cli::Cli) -> Result<()> {
         Command::Browse(args) => {
             let quiet = args.quiet || config.quiet_default;
             if let Some(selection) = tui::browse(&config, quiet)? {
+                if !quiet {
+                    print_apply_summary(&selection);
+                    output::apply_section("Progress");
+                }
                 let (waybar_mode, waybar_name) = match selection.waybar {
                     tui::WaybarSelection::NoChange => (WaybarMode::None, None),
                     tui::WaybarSelection::None => (WaybarMode::None, None),
@@ -138,6 +144,27 @@ pub fn run(cli: cli::Cli) -> Result<()> {
                     }
                 } else {
                     theme_ops::cmd_set(&ctx, &selection.theme)?;
+                }
+                match selection.unlock {
+                    tui::UnlockSelection::NoChange => {}
+                    tui::UnlockSelection::Default => {
+                        if !quiet {
+                            output::apply_step("Unlock", "Applying default boot unlock theme");
+                        }
+                        unlock::cmd_unlock_reset(quiet)?;
+                    }
+                    tui::UnlockSelection::Named(name) => {
+                        if !quiet {
+                            output::apply_step(
+                                "Unlock",
+                                format!("Applying {}", paths::title_case_theme(&name)),
+                            );
+                        }
+                        unlock::cmd_unlock_set(&config, &name, quiet)?;
+                    }
+                }
+                if !quiet {
+                    output::apply_done();
                 }
             }
         }
@@ -252,6 +279,19 @@ pub fn run(cli: cli::Cli) -> Result<()> {
                 cli.debug_awww,
             )?;
         }
+        Command::Unlock(args) => match args.command {
+            UnlockCommand::List => {
+                unlock::cmd_unlock_list(&config)?;
+            }
+            UnlockCommand::Set(set_args) => {
+                let quiet = set_args.quiet || config.quiet_default;
+                unlock::cmd_unlock_set(&config, &set_args.theme, quiet)?;
+            }
+            UnlockCommand::Reset(reset_args) => {
+                let quiet = reset_args.quiet || config.quiet_default;
+                unlock::cmd_unlock_reset(quiet)?;
+            }
+        },
         Command::Starship(args) => {
             let mode = parse_starship_spec(&args.mode, &config)?;
             let starship_mode = match mode {
@@ -266,6 +306,73 @@ pub fn run(cli: cli::Cli) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn print_apply_summary(selection: &tui::BrowseSelection) {
+    output::apply_header();
+    output::apply_section("Selection");
+    if selection.no_theme_change {
+        output::apply_item("Theme", "No change");
+    } else {
+        output::apply_item("Theme", paths::title_case_theme(&selection.theme));
+    }
+
+    if let Some(value) = waybar_summary(&selection.waybar) {
+        output::apply_item("Waybar", value);
+    }
+    if let Some(value) = walker_summary(&selection.walker) {
+        output::apply_item("Walker", value);
+    }
+    if let Some(value) = hyprlock_summary(&selection.hyprlock) {
+        output::apply_item("Hyprlock", value);
+    }
+    if let Some(value) = starship_summary(&selection.starship) {
+        output::apply_item("Starship", value);
+    }
+    if let Some(value) = unlock_summary(&selection.unlock) {
+        output::apply_item("Unlock", value);
+    }
+}
+
+fn waybar_summary(selection: &tui::WaybarSelection) -> Option<String> {
+    match selection {
+        tui::WaybarSelection::NoChange | tui::WaybarSelection::None => None,
+        tui::WaybarSelection::Auto => Some("Theme-provided".to_string()),
+        tui::WaybarSelection::Named(name) => Some(paths::title_case_theme(name)),
+    }
+}
+
+fn walker_summary(selection: &tui::WalkerSelection) -> Option<String> {
+    match selection {
+        tui::WalkerSelection::NoChange | tui::WalkerSelection::None => None,
+        tui::WalkerSelection::Auto => Some("Theme-provided".to_string()),
+        tui::WalkerSelection::Named(name) => Some(paths::title_case_theme(name)),
+    }
+}
+
+fn hyprlock_summary(selection: &tui::HyprlockSelection) -> Option<String> {
+    match selection {
+        tui::HyprlockSelection::NoChange | tui::HyprlockSelection::None => None,
+        tui::HyprlockSelection::Auto => Some("Theme-provided".to_string()),
+        tui::HyprlockSelection::Named(name) => Some(paths::title_case_theme(name)),
+    }
+}
+
+fn starship_summary(selection: &tui::StarshipSelection) -> Option<String> {
+    match selection {
+        tui::StarshipSelection::NoChange | tui::StarshipSelection::None => None,
+        tui::StarshipSelection::Preset(name) => Some(format!("Preset {}", name)),
+        tui::StarshipSelection::Named(name) => Some(paths::title_case_theme(name)),
+        tui::StarshipSelection::Theme(_) => Some("Theme-provided".to_string()),
+    }
+}
+
+fn unlock_summary(selection: &tui::UnlockSelection) -> Option<String> {
+    match selection {
+        tui::UnlockSelection::NoChange => None,
+        tui::UnlockSelection::Default => Some("Default".to_string()),
+        tui::UnlockSelection::Named(name) => Some(paths::title_case_theme(name)),
+    }
 }
 
 fn parse_waybar_flag(

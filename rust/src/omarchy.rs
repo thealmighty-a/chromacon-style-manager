@@ -95,6 +95,95 @@ pub fn run_optional(cmd: &str, args: &[&str], quiet: bool) -> Result<()> {
     run_command(cmd, args, quiet)
 }
 
+/// Attempt `omarchy <group> <cmd>` via the unified CLI (v3.7.0+).
+/// Returns Ok(Some(())) on success, Ok(None) when omarchy is absent or the
+/// subcommand is unregistered (exit 127), and Err on a genuine failure.
+/// Stderr is always captured so that "Unknown Omarchy command" probe noise
+/// never reaches the user; it is re-emitted only on genuine failures.
+fn try_omarchy_unified(
+    group: &str,
+    cmd: &str,
+    args: &[&str],
+    quiet: bool,
+    emit_stderr: bool,
+) -> Result<Option<()>> {
+    if !command_exists("omarchy") {
+        return Ok(None);
+    }
+    let mut all_args = vec![group, cmd];
+    all_args.extend_from_slice(args);
+    let mut command = Command::new("omarchy");
+    command.args(&all_args);
+    command.stderr(Stdio::piped());
+    if quiet {
+        command.stdout(Stdio::null());
+    }
+    let output = command.output()?;
+    if output.status.success() {
+        return Ok(Some(()));
+    }
+    // Exit 127 = unknown subcommand; fall back to legacy silently.
+    if output.status.code() == Some(127) {
+        return Ok(None);
+    }
+    if emit_stderr && !quiet && !output.stderr.is_empty() {
+        let _ = std::io::Write::write_all(&mut std::io::stderr(), &output.stderr);
+    }
+    Err(anyhow!("omarchy exited with {}", output.status))
+}
+
+/// Run an omarchy subcommand, preferring `omarchy <group> <cmd>` (v3.7.0+)
+/// and falling back to the legacy `omarchy-<group>-<cmd>` script. Silently
+/// skips if neither is found.
+pub fn run_omarchy_optional(group: &str, cmd: &str, args: &[&str], quiet: bool) -> Result<()> {
+    match try_omarchy_unified(group, cmd, args, quiet, false) {
+        Ok(Some(())) => return Ok(()),
+        Ok(None) => {}
+        Err(err) => {
+            if !quiet {
+                crate::output::apply_warning(format!(
+                    "Optional `omarchy {group} {cmd}` failed; continuing ({err})"
+                ));
+            }
+            return Ok(());
+        }
+    }
+
+    let legacy = format!("omarchy-{group}-{cmd}");
+    if !command_exists(&legacy) {
+        return Ok(());
+    }
+    match Command::new(&legacy).args(args).output() {
+        Ok(output) if output.status.success() => {}
+        Ok(output) => {
+            if !quiet {
+                crate::output::apply_warning(format!(
+                    "Optional `{legacy}` failed; continuing (exited with {})",
+                    output.status
+                ));
+            }
+        }
+        Err(err) => {
+            if !quiet {
+                crate::output::apply_warning(format!(
+                    "Optional `{legacy}` failed; continuing ({err})"
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Same as `run_omarchy_optional` but fails if neither the unified CLI
+/// subcommand nor the legacy script is found in PATH.
+pub fn run_omarchy_required(group: &str, cmd: &str, args: &[&str], quiet: bool) -> Result<()> {
+    if try_omarchy_unified(group, cmd, args, quiet, true)?.is_some() {
+        return Ok(());
+    }
+    let legacy = format!("omarchy-{group}-{cmd}");
+    run_required(&legacy, args, quiet)
+}
+
 pub fn run_command(cmd: &str, args: &[&str], quiet: bool) -> Result<()> {
     let mut command = Command::new(cmd);
     command.args(args);
@@ -119,12 +208,17 @@ pub fn reload_components(
     waybar_restart: Option<RestartAction>,
     waybar_restart_logs: bool,
 ) -> Result<()> {
-    run_optional("omarchy-restart-terminal", &[], quiet)?;
+    run_omarchy_optional("restart", "terminal", &[], quiet)?;
     restart_waybar_only(quiet, waybar_restart, waybar_restart_logs)?;
     restart_walker_only(quiet)?;
     restart_hyprlock_only(quiet)?;
     restart_swayosd(quiet)?;
+    run_omarchy_optional("restart", "hyprctl", &[], quiet)?;
     run_optional("hyprctl", &["reload"], quiet)?;
+    run_omarchy_optional("restart", "btop", &[], quiet)?;
+    run_omarchy_optional("restart", "opencode", &[], quiet)?;
+    run_omarchy_optional("restart", "mako", &[], quiet)?;
+    run_omarchy_optional("restart", "helix", &[], quiet)?;
     reload_notifications(quiet);
     if command_exists("pkill") {
         let _ = run_command("pkill", &["-SIGUSR2", "btop"], true);
@@ -137,20 +231,15 @@ pub fn restart_walker_only(quiet: bool) -> Result<()> {
         let _ = run_command("pkill", &["-f", "walker --gapplication-service"], true);
         let _ = run_command("pkill", &["-x", "walker"], true);
     }
-    run_optional("omarchy-restart-walker", &[], quiet)
+    run_omarchy_optional("restart", "walker", &[], quiet)
 }
 
 pub fn restart_hyprlock_only(quiet: bool) -> Result<()> {
+    let _ = quiet;
     if command_exists("pkill") {
         let _ = run_command("pkill", &["-x", "hyprlock"], true);
     }
-    if command_exists("omarchy-restart-hyprlock") {
-        return run_command("omarchy-restart-hyprlock", &[], quiet);
-    }
-
-    // Omarchy currently provides `omarchy-system-lock` and launches hyprlock on demand,
-    // but does not ship a dedicated restart helper on all installs.
-    let _ = quiet;
+    // Omarchy launches hyprlock on demand; no restart helper exists or is needed.
     Ok(())
 }
 
@@ -174,7 +263,7 @@ pub fn restart_waybar_only(
             }
         }
     } else {
-        run_optional("omarchy-restart-waybar", &[], quiet)?;
+        run_omarchy_optional("restart", "waybar", &[], quiet)?;
     }
     Ok(())
 }
@@ -254,7 +343,7 @@ fn start_swayosd(quiet: bool) -> Result<()> {
 
 fn restart_swayosd(quiet: bool) -> Result<()> {
     let before = pgrep_pids("swayosd-server");
-    if let Err(err) = run_optional("omarchy-restart-swayosd", &[], quiet) {
+    if let Err(err) = run_omarchy_optional("restart", "swayosd", &[], quiet) {
         if !quiet {
             eprintln!("theme-manager: swayosd restart command failed: {err}");
         }
@@ -428,10 +517,11 @@ fn restart_waybar_exec(config_path: &Path, style_path: &Path, quiet: bool) -> Re
 }
 
 pub fn apply_theme_setters(quiet: bool) -> Result<()> {
-    run_optional("omarchy-theme-set-gnome", &[], quiet)?;
-    run_optional("omarchy-theme-set-browser", &[], quiet)?;
-    run_optional("omarchy-theme-set-vscode", &[], quiet)?;
-    run_optional("omarchy-theme-set-obsidian", &[], quiet)?;
+    run_omarchy_optional("theme", "set-gnome", &[], quiet)?;
+    run_omarchy_optional("theme", "set-browser", &[], quiet)?;
+    run_omarchy_optional("theme", "set-vscode", &[], quiet)?;
+    run_omarchy_optional("theme", "set-obsidian", &[], quiet)?;
+    run_omarchy_optional("theme", "set-keyboard", &[], quiet)?;
     Ok(())
 }
 
@@ -501,7 +591,29 @@ pub fn run_awww_transition(config: &ResolvedConfig, quiet: bool, debug_awww: boo
     }
 }
 
-pub fn run_hook(hook_path: &Path, args: &[&str], quiet: bool) -> Result<()> {
+pub fn run_theme_hook(theme_name: &str, quiet: bool) -> Result<()> {
+    if command_exists("omarchy-hook") {
+        return run_hook_command("omarchy-hook", &["theme-set", theme_name], quiet);
+    }
+
+    let hook_path = PathBuf::from(format!(
+        "{}/.config/omarchy/hooks/theme-set",
+        std::env::var("HOME").unwrap_or_default()
+    ));
+    run_hook_file(&hook_path, &[theme_name], quiet)
+}
+
+fn run_hook_command(cmd: &str, args: &[&str], quiet: bool) -> Result<()> {
+    let mut command = Command::new(cmd);
+    command.args(args);
+    if quiet {
+        command.stdout(Stdio::null()).stderr(Stdio::null());
+    }
+    let _ = command.status();
+    Ok(())
+}
+
+fn run_hook_file(hook_path: &Path, args: &[&str], quiet: bool) -> Result<()> {
     if !hook_path.is_file() {
         return Ok(());
     }
