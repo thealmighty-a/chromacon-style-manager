@@ -164,11 +164,7 @@ pub fn cmd_set(ctx: &CommandContext<'_>, theme_name: &str) -> Result<()> {
     }
 
     if !ctx.skip_hook {
-        let hook_path = PathBuf::from(format!(
-            "{}/.config/omarchy/hooks/theme-set",
-            std::env::var("HOME").unwrap_or_default()
-        ));
-        let _ = omarchy::run_hook(&hook_path, &[&normalized], ctx.quiet);
+        let _ = omarchy::run_theme_hook(&normalized, ctx.quiet);
     }
 
     Ok(())

@@ -39,6 +39,13 @@ pub fn cmd_with_apps_env(env: &TestEnv) -> Command {
     cmd
 }
 
+pub fn cmd_with_hooks_env(env: &TestEnv) -> Command {
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("theme-manager"));
+    configure_cmd_env(&mut cmd, env, true);
+    cmd.env_remove("THEME_MANAGER_SKIP_HOOK");
+    cmd
+}
+
 fn configure_cmd_env(cmd: &mut Command, env: &TestEnv, skip_apps: bool) {
     cmd.env("HOME", &env.home);
     if skip_apps {

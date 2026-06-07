@@ -85,6 +85,54 @@ EOF
 }
 
 #[test]
+fn set_runs_omarchy_hook_dispatcher_when_available() {
+    let env = setup_env();
+    let themes = omarchy_dir(&env.home).join("themes");
+    fs::create_dir_all(themes.join("tokyo-night")).unwrap();
+
+    let marker = env.temp.path().join("hook-called");
+    write_script(
+        &env.bin.join("omarchy-hook"),
+        &format!(
+            "#!/usr/bin/env bash\nset -euo pipefail\nprintf '%s\\n' \"$*\" > {}\n",
+            marker.display()
+        ),
+    );
+
+    let mut cmd = cmd_with_hooks_env(&env);
+    cmd.args(["set", "Tokyo Night"]);
+    cmd.assert().success();
+
+    let content = fs::read_to_string(marker).unwrap();
+    assert_eq!(content.trim(), "theme-set tokyo-night");
+}
+
+#[test]
+fn set_falls_back_to_legacy_theme_set_hook_file() {
+    let env = setup_env();
+    let themes = omarchy_dir(&env.home).join("themes");
+    fs::create_dir_all(themes.join("tokyo-night")).unwrap();
+
+    let hooks = omarchy_dir(&env.home).join("hooks");
+    fs::create_dir_all(&hooks).unwrap();
+    let marker = env.temp.path().join("legacy-hook-called");
+    write_script(
+        &hooks.join("theme-set"),
+        &format!(
+            "#!/usr/bin/env bash\nset -euo pipefail\nprintf '%s\\n' \"$*\" > {}\n",
+            marker.display()
+        ),
+    );
+
+    let mut cmd = cmd_with_hooks_env(&env);
+    cmd.args(["set", "Tokyo Night"]);
+    cmd.assert().success();
+
+    let content = fs::read_to_string(marker).unwrap();
+    assert_eq!(content.trim(), "tokyo-night");
+}
+
+#[test]
 fn current_errors_when_missing() {
     let env = setup_env();
     let mut cmd = cmd_with_env(&env);

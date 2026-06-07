@@ -591,7 +591,29 @@ pub fn run_awww_transition(config: &ResolvedConfig, quiet: bool, debug_awww: boo
     }
 }
 
-pub fn run_hook(hook_path: &Path, args: &[&str], quiet: bool) -> Result<()> {
+pub fn run_theme_hook(theme_name: &str, quiet: bool) -> Result<()> {
+    if command_exists("omarchy-hook") {
+        return run_hook_command("omarchy-hook", &["theme-set", theme_name], quiet);
+    }
+
+    let hook_path = PathBuf::from(format!(
+        "{}/.config/omarchy/hooks/theme-set",
+        std::env::var("HOME").unwrap_or_default()
+    ));
+    run_hook_file(&hook_path, &[theme_name], quiet)
+}
+
+fn run_hook_command(cmd: &str, args: &[&str], quiet: bool) -> Result<()> {
+    let mut command = Command::new(cmd);
+    command.args(args);
+    if quiet {
+        command.stdout(Stdio::null()).stderr(Stdio::null());
+    }
+    let _ = command.status();
+    Ok(())
+}
+
+fn run_hook_file(hook_path: &Path, args: &[&str], quiet: bool) -> Result<()> {
     if !hook_path.is_file() {
         return Ok(());
     }
