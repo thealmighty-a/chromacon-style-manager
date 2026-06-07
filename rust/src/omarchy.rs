@@ -141,9 +141,9 @@ pub fn run_omarchy_optional(group: &str, cmd: &str, args: &[&str], quiet: bool) 
         Ok(None) => {}
         Err(err) => {
             if !quiet {
-                eprintln!(
-                    "theme-manager: optional omarchy {group} {cmd} failed; continuing: {err}"
-                );
+                crate::output::apply_warning(format!(
+                    "Optional `omarchy {group} {cmd}` failed; continuing ({err})"
+                ));
             }
             return Ok(());
         }
@@ -153,9 +153,22 @@ pub fn run_omarchy_optional(group: &str, cmd: &str, args: &[&str], quiet: bool) 
     if !command_exists(&legacy) {
         return Ok(());
     }
-    if let Err(err) = run_command(&legacy, args, quiet) {
-        if !quiet {
-            eprintln!("theme-manager: optional {legacy} failed; continuing: {err}");
+    match Command::new(&legacy).args(args).output() {
+        Ok(output) if output.status.success() => {}
+        Ok(output) => {
+            if !quiet {
+                crate::output::apply_warning(format!(
+                    "Optional `{legacy}` failed; continuing (exited with {})",
+                    output.status
+                ));
+            }
+        }
+        Err(err) => {
+            if !quiet {
+                crate::output::apply_warning(format!(
+                    "Optional `{legacy}` failed; continuing ({err})"
+                ));
+            }
         }
     }
     Ok(())

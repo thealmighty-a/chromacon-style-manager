@@ -11,6 +11,7 @@ All notable changes to this project are documented in this file.
 - Added an Unlock tab to the TUI with `No Unlock change`, `Default`, and discovered unlock themes with previews.
 - Added compatibility with Omarchy 3.7 grouped `omarchy plymouth ...` commands while retaining legacy `omarchy-plymouth-*` fallback.
 - Updated the apply pipeline for Omarchy 3.7 restart/setter coverage (`hyprctl`, `btop`, `opencode`, `mako`, `helix`, and keyboard theme setter).
+- Polished TUI apply terminal output with an aligned summary, explicit progress lines, completion status, and quieter optional helper failures.
 - Updated the Hyprlock standalone test to assert the current no-`omarchy-restart-hyprlock` behavior.
 
 ## 0.3.5

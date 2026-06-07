@@ -42,7 +42,7 @@ fn apply_preset(ctx: &CommandContext<'_>, config_path: &Path, preset: &str) -> R
         return Err(anyhow!("starship not found in PATH"));
     }
     if !ctx.quiet {
-        println!("theme-manager: applying starship preset {preset}");
+        crate::output::apply_step("Starship", format!("Applying preset {preset}"));
     }
     let output = std::process::Command::new("starship")
         .args(["preset", preset])
@@ -71,9 +71,9 @@ fn apply_named(
         ));
     }
     if !ctx.quiet {
-        println!(
-            "theme-manager: applying starship theme {}",
-            theme_path.to_string_lossy()
+        crate::output::apply_step(
+            "Starship",
+            format!("Applying theme {}", theme_path.to_string_lossy()),
         );
     }
     fs::copy(&theme_path, config_path)?;
@@ -88,9 +88,9 @@ fn copy_theme(ctx: &CommandContext<'_>, config_path: &Path, theme_path: &Path) -
         ));
     }
     if !ctx.quiet {
-        println!(
-            "theme-manager: applying starship theme {}",
-            theme_path.to_string_lossy()
+        crate::output::apply_step(
+            "Starship",
+            format!("Applying theme {}", theme_path.to_string_lossy()),
         );
     }
     fs::copy(theme_path, config_path)?;
