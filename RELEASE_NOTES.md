@@ -2,8 +2,11 @@
 
 ## Unreleased
 
+## 0.3.6
+
 - Added `theme-manager unlock list|set|reset` and a TUI Unlock tab for Omarchy 3.7 boot unlock themes, delegating apply/reset work to Omarchy’s Plymouth commands.
 - Theme application now includes the new Omarchy 3.7 restart/app-theme steps while keeping legacy command fallback.
+- Theme hooks now run through `omarchy-hook theme-set`, so Omarchy 3.8.2+ `theme-set.d/` hooks and `thpm` plugins run after TM+ applies a theme.
 - TUI theme apply output now shows a structured summary, progress lines, clean warnings, and a final completion status instead of raw helper chatter.
 
 ## 0.3.5

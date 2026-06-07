@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+## 0.3.6
+
 - Added Omarchy 3.7 unlock theme support:
   - `theme-manager unlock list`
   - `theme-manager unlock set <theme>`
