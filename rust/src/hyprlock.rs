@@ -11,19 +11,11 @@ use crate::theme_ops::{CommandContext, HyprlockMode};
 
 const OMARCHY_DEFAULT_THEME_NAME: &str = "omarchy-default";
 const CURRENT_THEME_SOURCE_SUFFIX: &str = "/.local/state/cc/theme/hyprlock.conf";
-const MINIMAL_SOURCE_ONLY_HYPRLOCK: &str = r#"source = ~/.local/state/cc/theme/hyprlock.conf
-
-general {
-    ignore_empty_input = true
-}
-
-animations {
-    enabled = false
-}
-
-auth {
-    fingerprint:enabled = true
-}
+// ChromaCon: the host file always pulls in the cc layout, so rewriting it can
+// never leave hyprlock without a background/input field (a black lock screen).
+const MINIMAL_SOURCE_ONLY_HYPRLOCK: &str = r#"# ChromaCon lock screen: theme colors, then the cc layout.
+source = ~/.local/state/cc/theme/hyprlock.conf
+source = ~/.config/hypr/hyprlock-layout.conf
 "#;
 
 pub fn prepare_hyprlock(ctx: &CommandContext<'_>, theme_dir: &Path) -> Result<()> {
