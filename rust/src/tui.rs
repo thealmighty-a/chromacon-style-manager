@@ -38,7 +38,7 @@ use crate::unlock;
 use crate::walker;
 use crate::waybar;
 
-const APP_TITLE: &str = concat!("Theme Manager+ v", env!("THEME_MANAGER_VERSION"));
+const APP_TITLE: &str = concat!("ChromaCon Style Manager v", env!("THEME_MANAGER_VERSION"));
 const NO_THEME_CHANGE_VALUE: &str = "__no_theme_change__";
 const NO_THEME_CHANGE_LABEL: &str = "No theme change";
 
@@ -2164,7 +2164,7 @@ fn render_picker<T: ItemView>(
     let action = decide_preview_action(wants_image, state.image_visible, invalidate);
     if preview_debug_enabled() {
         eprintln!(
-      "theme-manager: preview {:?} tab={} sel={:?} path={:?} rect={}x{}@{}x{} invalidate={} visible={} wants_image={}",
+      "chromacon-style-manager: preview {:?} tab={} sel={:?} path={:?} rect={}x{}@{}x{} invalidate={} visible={} wants_image={}",
       action,
       title,
       state.last_preview_index,
@@ -3402,7 +3402,7 @@ fn list_walker_themes(walker_themes_dir: &Path) -> Result<Vec<String>> {
         if path.is_dir() && path.join("style.css").is_file() {
             if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
                 // Skip the auto-generated theme
-                if name != "theme-manager-auto" {
+                if name != "cc-auto" {
                     entries.push(name.to_string());
                 }
             }

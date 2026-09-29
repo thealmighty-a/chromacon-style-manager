@@ -28,19 +28,19 @@ pub fn setup_env() -> TestEnv {
 }
 
 pub fn cmd_with_env(env: &TestEnv) -> Command {
-    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("theme-manager"));
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("chromacon-style-manager"));
     configure_cmd_env(&mut cmd, env, true);
     cmd
 }
 
 pub fn cmd_with_apps_env(env: &TestEnv) -> Command {
-    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("theme-manager"));
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("chromacon-style-manager"));
     configure_cmd_env(&mut cmd, env, false);
     cmd
 }
 
 pub fn cmd_with_hooks_env(env: &TestEnv) -> Command {
-    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("theme-manager"));
+    let mut cmd = Command::new(assert_cmd::cargo::cargo_bin!("chromacon-style-manager"));
     configure_cmd_env(&mut cmd, env, true);
     cmd.env_remove("THEME_MANAGER_SKIP_HOOK");
     cmd

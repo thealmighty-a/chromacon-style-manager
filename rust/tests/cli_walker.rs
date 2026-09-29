@@ -20,7 +20,7 @@ fn walker_apply_named_updates_config() {
     fs::create_dir_all(&walker_dir).unwrap();
     fs::write(walker_dir.join("config.toml"), "theme = \"old\"\n").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -59,7 +59,7 @@ fn walker_named_updates_only_theme_key() {
     )
     .unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -99,7 +99,7 @@ fn walker_apply_auto_creates_theme_dir() {
     let walker_themes = walker_dir.join("themes");
     fs::create_dir_all(&walker_themes).unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -115,13 +115,13 @@ default_mode = "auto"
     cmd.assert().success();
 
     // Verify the auto theme was created
-    let auto_theme = walker_themes.join("theme-manager-auto");
+    let auto_theme = walker_themes.join("cc-auto");
     assert!(auto_theme.is_dir());
     assert!(auto_theme.join("style.css").exists());
 
     // Verify config was updated
     let config_content = fs::read_to_string(walker_dir.join("config.toml")).unwrap();
-    assert!(config_content.contains("theme = \"theme-manager-auto\""));
+    assert!(config_content.contains("theme = \"cc-auto\""));
 }
 
 #[test]
@@ -139,12 +139,12 @@ fn walker_auto_cleans_stale_files() {
     fs::write(walker_dir.join("config.toml"), "theme = \"old\"\n").unwrap();
 
     let walker_themes = walker_dir.join("themes");
-    let auto_theme = walker_themes.join("theme-manager-auto");
+    let auto_theme = walker_themes.join("cc-auto");
     fs::create_dir_all(&auto_theme).unwrap();
     fs::write(auto_theme.join("style.css"), "old-style").unwrap();
     fs::write(auto_theme.join("stale.txt"), "stale").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -197,7 +197,7 @@ fn walker_standalone_command() {
         &format!("#!/usr/bin/env bash\n\necho ok > {}\n", marker.display()),
     );
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(&cfg_dir.join("config.toml"), "");
 
@@ -224,7 +224,7 @@ fn walker_none_skips_theme() {
     fs::create_dir_all(&walker_dir).unwrap();
     fs::write(walker_dir.join("config.toml"), "theme = \"original\"\n").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -258,7 +258,7 @@ fn set_walker_flag_overrides_defaults() {
     fs::create_dir_all(&walker_theme).unwrap();
     fs::write(walker_theme.join("style.css"), "style").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -299,7 +299,7 @@ fn next_walker_auto_flag_uses_theme_walker() {
     cmd.assert().success();
 
     let content = fs::read_to_string(walker_dir.join("config.toml")).unwrap();
-    assert!(content.contains("theme = \"theme-manager-auto\""));
+    assert!(content.contains("theme = \"cc-auto\""));
 }
 
 #[test]
@@ -319,7 +319,7 @@ fn walker_links_omarchy_default_theme_when_missing() {
     fs::create_dir_all(&walker_dir).unwrap();
     fs::write(walker_dir.join("config.toml"), "theme = \"old\"\n").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -359,7 +359,7 @@ fn walker_links_omarchy_default_from_base_default_walker_dir() {
     fs::create_dir_all(&walker_dir).unwrap();
     fs::write(walker_dir.join("config.toml"), "theme = \"old\"\n").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -402,7 +402,7 @@ fn walker_prefers_named_default_over_base_default() {
     fs::create_dir_all(&walker_dir).unwrap();
     fs::write(walker_dir.join("config.toml"), "theme = \"old\"\n").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -437,7 +437,7 @@ fn walker_missing_default_style_does_not_create_default_link() {
     fs::create_dir_all(&walker_dir).unwrap();
     fs::write(walker_dir.join("config.toml"), "theme = \"old\"\n").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),

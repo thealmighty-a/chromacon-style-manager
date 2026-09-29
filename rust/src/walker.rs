@@ -7,7 +7,7 @@ use crate::omarchy_defaults;
 use crate::omarchy_defaults::SymlinkEnsureResult;
 use crate::theme_ops::{CommandContext, WalkerMode};
 
-const AUTO_THEME_NAME: &str = "theme-manager-auto";
+const AUTO_THEME_NAME: &str = "cc-auto";
 const OMARCHY_DEFAULT_THEME_NAME: &str = "omarchy-default";
 
 pub fn prepare_walker(ctx: &CommandContext<'_>, theme_dir: &Path) -> Result<()> {
@@ -31,7 +31,7 @@ pub fn prepare_walker(ctx: &CommandContext<'_>, theme_dir: &Path) -> Result<()> 
     if !walker_theme_dir.is_dir() {
         if !ctx.quiet {
             eprintln!(
-                "theme-manager: walker theme directory not found: {}",
+                "chromacon-style-manager: walker theme directory not found: {}",
                 walker_theme_dir.to_string_lossy()
             );
         }
@@ -43,7 +43,7 @@ pub fn prepare_walker(ctx: &CommandContext<'_>, theme_dir: &Path) -> Result<()> 
     if !style_path.is_file() {
         if !ctx.quiet {
             eprintln!(
-                "theme-manager: walker theme missing style.css in {}",
+                "chromacon-style-manager: walker theme missing style.css in {}",
                 walker_theme_dir.to_string_lossy()
             );
         }
@@ -78,7 +78,7 @@ pub fn ensure_omarchy_default_theme_link(config: &ResolvedConfig, quiet: bool) -
         SymlinkEnsureResult::Created => {
             if !quiet {
                 println!(
-                    "theme-manager: linked Omarchy default Walker theme {} -> {}",
+                    "chromacon-style-manager: linked Omarchy default Walker theme {} -> {}",
                     link_path.to_string_lossy(),
                     default_theme_dir.to_string_lossy()
                 );
@@ -87,7 +87,7 @@ pub fn ensure_omarchy_default_theme_link(config: &ResolvedConfig, quiet: bool) -
         SymlinkEnsureResult::Updated => {
             if !quiet {
                 println!(
-                    "theme-manager: repaired Omarchy default Walker theme link {} -> {}",
+                    "chromacon-style-manager: repaired Omarchy default Walker theme link {} -> {}",
                     link_path.to_string_lossy(),
                     default_theme_dir.to_string_lossy()
                 );
@@ -96,7 +96,7 @@ pub fn ensure_omarchy_default_theme_link(config: &ResolvedConfig, quiet: bool) -
         SymlinkEnsureResult::SkippedNonSymlink => {
             if !quiet {
                 eprintln!(
-          "theme-manager: warning: preserving non-symlink path {}; cannot link Omarchy default Walker theme",
+          "chromacon-style-manager: warning: preserving non-symlink path {}; cannot link Omarchy default Walker theme",
           link_path.to_string_lossy()
         );
             }
@@ -113,7 +113,7 @@ fn update_walker_config(ctx: &CommandContext<'_>, theme_name: &str) -> Result<()
     if !config_path.is_file() {
         if !ctx.quiet {
             eprintln!(
-                "theme-manager: walker config not found at {}",
+                "chromacon-style-manager: walker config not found at {}",
                 config_path.to_string_lossy()
             );
         }
@@ -147,7 +147,7 @@ fn update_walker_config(ctx: &CommandContext<'_>, theme_name: &str) -> Result<()
     }
 
     if !ctx.quiet {
-        println!("theme-manager: setting walker theme to \"{}\"", theme_name);
+        println!("chromacon-style-manager: setting walker theme to \"{}\"", theme_name);
     }
 
     fs::write(&config_path, new_lines.join("\n") + "\n")?;
@@ -167,7 +167,7 @@ fn apply_copy(
 
     if !ctx.quiet {
         println!(
-            "theme-manager: copying walker theme from {}",
+            "chromacon-style-manager: copying walker theme from {}",
             theme_dir.to_string_lossy()
         );
     }
@@ -214,7 +214,7 @@ fn apply_symlink(
 
     if !ctx.quiet {
         println!(
-            "theme-manager: linking walker theme from {}",
+            "chromacon-style-manager: linking walker theme from {}",
             theme_dir.to_string_lossy()
         );
     }
@@ -256,7 +256,7 @@ fn cleanup_auto_theme_dir(walker_themes_dir: &Path, quiet: bool) -> Result<()> {
 
     if !quiet {
         println!(
-            "theme-manager: removing stale walker auto theme {}",
+            "chromacon-style-manager: removing stale walker auto theme {}",
             auto_theme_dir.to_string_lossy()
         );
     }

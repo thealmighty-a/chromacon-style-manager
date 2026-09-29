@@ -111,7 +111,7 @@ pub fn ensure_omarchy_default_theme_link(config: &ResolvedConfig, quiet: bool) -
         SymlinkEnsureResult::Created => {
             if !quiet {
                 println!(
-                    "theme-manager: linked Omarchy default Starship theme {} -> {}",
+                    "chromacon-style-manager: linked Omarchy default Starship theme {} -> {}",
                     link_path.to_string_lossy(),
                     default_theme_file.to_string_lossy()
                 );
@@ -120,7 +120,7 @@ pub fn ensure_omarchy_default_theme_link(config: &ResolvedConfig, quiet: bool) -
         SymlinkEnsureResult::Updated => {
             if !quiet {
                 println!(
-                    "theme-manager: repaired Omarchy default Starship theme link {} -> {}",
+                    "chromacon-style-manager: repaired Omarchy default Starship theme link {} -> {}",
                     link_path.to_string_lossy(),
                     default_theme_file.to_string_lossy()
                 );
@@ -129,7 +129,7 @@ pub fn ensure_omarchy_default_theme_link(config: &ResolvedConfig, quiet: bool) -
         SymlinkEnsureResult::SkippedNonSymlink => {
             if !quiet {
                 eprintln!(
-          "theme-manager: warning: preserving non-symlink path {}; cannot link Omarchy default Starship theme",
+          "chromacon-style-manager: warning: preserving non-symlink path {}; cannot link Omarchy default Starship theme",
           link_path.to_string_lossy()
         );
             }

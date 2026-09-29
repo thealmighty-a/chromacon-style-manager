@@ -1,13 +1,13 @@
 [package]
-name = "theme-manager-plus"
+name = "chromacon-style-manager"
 version = "0.3.0"
 edition = "2021"
-description = "Rust rewrite of Theme Manager Plus (scaffolding)"
+description = "ChromaCon Style Manager: themes, waybar, walker and hyprlock switcher (fork of Theme Manager Plus)"
 license = "MIT"
 build = "build.rs"
 
 [[bin]]
-name = "theme-manager"
+name = "chromacon-style-manager"
 path = "src/main.rs"
 
 [dependencies]

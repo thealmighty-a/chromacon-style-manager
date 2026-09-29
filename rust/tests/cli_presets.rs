@@ -51,7 +51,7 @@ fn preset_save_list_load_remove() {
 #[test]
 fn preset_load_errors_on_missing_theme() {
     let env = setup_env();
-    let preset_dir = env.home.join(".config/theme-manager");
+    let preset_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&preset_dir).unwrap();
     write_toml(
         &preset_dir.join("presets.toml"),
@@ -75,7 +75,7 @@ fn preset_load_errors_on_theme_starship_missing() {
     let themes = omarchy_dir(&env.home).join("themes");
     fs::create_dir_all(themes.join("noir")).unwrap();
 
-    let preset_dir = env.home.join(".config/theme-manager");
+    let preset_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&preset_dir).unwrap();
     write_toml(
         &preset_dir.join("presets.toml"),
@@ -109,7 +109,7 @@ fn preset_load_waybar_override() {
     fs::write(named_dir.join("config.jsonc"), "{ \"named\": true }").unwrap();
     fs::write(named_dir.join("style.css"), "/* named */").unwrap();
 
-    let preset_dir = env.home.join(".config/theme-manager");
+    let preset_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&preset_dir).unwrap();
     write_toml(
         &preset_dir.join("presets.toml"),
@@ -153,7 +153,7 @@ fn preset_save_persists_walker_value() {
     ]);
     cmd.assert().success();
 
-    let presets = fs::read_to_string(env.home.join(".config/theme-manager/presets.toml")).unwrap();
+    let presets = fs::read_to_string(env.home.join(".config/chromacon-style-manager/presets.toml")).unwrap();
     assert!(presets.contains("[preset.WalkerDaily.walker]"));
     assert!(presets.contains("mode = \"named\""));
     assert!(presets.contains("name = \"named-theme\""));
@@ -175,7 +175,7 @@ fn preset_load_walker_override() {
     fs::create_dir_all(&walker_dir).unwrap();
     fs::write(walker_dir.join("config.toml"), "theme = \"old\"\n").unwrap();
 
-    let preset_dir = env.home.join(".config/theme-manager");
+    let preset_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&preset_dir).unwrap();
     write_toml(
         &preset_dir.join("presets.toml"),
@@ -216,7 +216,7 @@ fn preset_save_persists_hyprlock_value() {
     ]);
     cmd.assert().success();
 
-    let presets = fs::read_to_string(env.home.join(".config/theme-manager/presets.toml")).unwrap();
+    let presets = fs::read_to_string(env.home.join(".config/chromacon-style-manager/presets.toml")).unwrap();
     assert!(presets.contains("[preset.HyprlockDaily.hyprlock]"));
     assert!(presets.contains("mode = \"named\""));
     assert!(presets.contains("name = \"named-hl\""));
@@ -234,7 +234,7 @@ fn preset_load_hyprlock_override() {
     fs::create_dir_all(&shared).unwrap();
     fs::write(shared.join("hyprlock.conf"), "shared-hyprlock").unwrap();
 
-    let preset_dir = env.home.join(".config/theme-manager");
+    let preset_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&preset_dir).unwrap();
     write_toml(
         &preset_dir.join("presets.toml"),

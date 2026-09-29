@@ -2,9 +2,9 @@ use anyhow::Result;
 use clap::Parser;
 
 fn main() -> Result<()> {
-    let cli = theme_manager_plus::cli::Cli::parse();
-    if let Err(err) = theme_manager_plus::run(cli) {
-        eprintln!("theme-manager: {err}");
+    let cli = chromacon_style_manager::cli::Cli::parse();
+    if let Err(err) = chromacon_style_manager::run(cli) {
+        eprintln!("chromacon-style-manager: {err}");
         std::process::exit(1);
     }
     Ok(())

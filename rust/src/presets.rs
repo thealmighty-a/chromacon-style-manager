@@ -99,7 +99,7 @@ pub struct PresetSummary {
 
 pub fn presets_path() -> Result<PathBuf> {
     let home = env::var("HOME").map_err(|_| anyhow!("HOME is not set"))?;
-    Ok(PathBuf::from(home).join(".config/theme-manager/presets.toml"))
+    Ok(PathBuf::from(home).join(".config/chromacon-style-manager/presets.toml"))
 }
 
 pub fn load_presets() -> Result<PresetFile> {

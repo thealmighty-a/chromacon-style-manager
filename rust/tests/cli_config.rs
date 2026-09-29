@@ -9,7 +9,7 @@ fn local_config_overrides_user_config() {
     let project = env.temp.path().join("project");
     fs::create_dir_all(&project).unwrap();
 
-    let user_cfg_dir = env.home.join(".config/theme-manager");
+    let user_cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&user_cfg_dir).unwrap();
     write_toml(
         &user_cfg_dir.join("config.toml"),
@@ -26,7 +26,7 @@ theme_root_dir = "~/.config/omarchy/themes-user"
     .unwrap();
 
     write_toml(
-        &project.join(".theme-manager.toml"),
+        &project.join(".chromacon-style-manager.toml"),
         r#"[paths]
 theme_root_dir = "~/.config/omarchy/themes-local"
 "#,

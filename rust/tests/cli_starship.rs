@@ -10,7 +10,7 @@ fn starship_preset_applies() {
     let themes = omarchy_dir(&env.home).join("themes");
     fs::create_dir_all(themes.join("theme-a")).unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -44,7 +44,7 @@ fn starship_named_applies() {
     let themes = omarchy_dir(&env.home).join("themes");
     fs::create_dir_all(themes.join("theme-a")).unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -76,7 +76,7 @@ fn starship_preset_missing_errors() {
     let themes = omarchy_dir(&env.home).join("themes");
     fs::create_dir_all(themes.join("theme-a")).unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -104,7 +104,7 @@ fn starship_named_missing_errors() {
     let themes = omarchy_dir(&env.home).join("themes");
     fs::create_dir_all(themes.join("theme-a")).unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -133,7 +133,7 @@ fn starship_links_omarchy_default_theme_when_missing() {
     fs::create_dir_all(omarchy_default.parent().unwrap()).unwrap();
     fs::write(&omarchy_default, "format = 'omarchy'\n").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -185,7 +185,7 @@ fn starship_repairs_existing_omarchy_default_symlink_target() {
     #[cfg(unix)]
     std::os::unix::fs::symlink(&wrong_default, &link_path).unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -221,7 +221,7 @@ fn starship_prefers_named_default_over_direct_default() {
     fs::create_dir_all(named_default.parent().unwrap()).unwrap();
     fs::write(&named_default, "format = 'named'\n").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -254,7 +254,7 @@ fn starship_uses_omarchy_root_config_starship_toml_when_default_paths_missing() 
     fs::create_dir_all(config_default.parent().unwrap()).unwrap();
     fs::write(&config_default, "format = 'config-default'\n").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -283,7 +283,7 @@ fn starship_missing_omarchy_default_errors_when_requested() {
     let themes = omarchy_dir(&env.home).join("themes");
     fs::create_dir_all(themes.join("theme-a")).unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),

@@ -67,7 +67,7 @@ pub fn cmd_update(ctx: &GitContext<'_>) -> Result<()> {
     }
 
     if updated == 0 {
-        eprintln!("theme-manager: no git-based themes found");
+        eprintln!("chromacon-style-manager: no git-based themes found");
     }
     Ok(())
 }

@@ -22,7 +22,7 @@ fn hyprlock_apply_named_updates_config() {
     fs::create_dir_all(&hyprlock_theme).unwrap();
     fs::write(hyprlock_theme.join("hyprlock.conf"), "general { }").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -52,7 +52,7 @@ fn hyprlock_apply_auto_uses_theme_hyprlock() {
     fs::create_dir_all(&hyprlock_theme).unwrap();
     fs::write(hyprlock_theme.join("hyprlock.conf"), "theme-auto").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -94,7 +94,7 @@ fn hyprlock_apply_stays_quiet_when_restart_helper_is_missing() {
         write_stub_ok(&env.bin.join(cmd));
     }
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -122,7 +122,7 @@ fn hyprlock_none_leaves_existing_config() {
     fs::create_dir_all(&hypr_dir).unwrap();
     fs::write(hypr_dir.join("hyprlock.conf"), "keep").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -151,7 +151,7 @@ fn hyprlock_links_omarchy_default_theme_when_missing() {
     fs::create_dir_all(&omarchy_default).unwrap();
     fs::write(omarchy_default.join("hyprlock.conf"), "omarchy").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -186,7 +186,7 @@ fn hyprlock_links_omarchy_default_from_omarchy_root_themes_dir() {
     fs::create_dir_all(&omarchy_default).unwrap();
     fs::write(omarchy_default.join("hyprlock.conf"), "omarchy-theme-root").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -225,7 +225,7 @@ fn hyprlock_links_omarchy_default_from_config_omarchy_themes_dir() {
     )
     .unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -260,7 +260,7 @@ fn hyprlock_links_omarchy_default_from_omarchy_root_config_hypr_dir() {
     fs::create_dir_all(&omarchy_default).unwrap();
     fs::write(omarchy_default.join("hyprlock.conf"), "omarchy-config-hypr").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -301,7 +301,7 @@ fn hyprlock_prefers_highest_precedence_default_candidate() {
     fs::create_dir_all(&lower_candidate).unwrap();
     fs::write(lower_candidate.join("hyprlock.conf"), "lower").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -333,7 +333,7 @@ fn hyprlock_missing_default_file_does_not_create_default_link() {
     let invalid_default = env.home.join(".local/share/omarchy/default/hyprlock");
     fs::create_dir_all(&invalid_default).unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),

@@ -128,10 +128,10 @@ impl ResolvedConfig {
 
         let mut config = ResolvedConfig::defaults(&home_path);
 
-        if let Some(user_cfg) = load_toml(&home_path.join(".config/theme-manager/config.toml"))? {
+        if let Some(user_cfg) = load_toml(&home_path.join(".config/chromacon-style-manager/config.toml"))? {
             config.apply_file_config(&user_cfg, &home_path);
         }
-        if let Some(local_cfg) = load_toml(&current_dir()?.join(".theme-manager.toml"))? {
+        if let Some(local_cfg) = load_toml(&current_dir()?.join(".chromacon-style-manager.toml"))? {
             config.apply_file_config(&local_cfg, &home_path);
         }
 

@@ -47,7 +47,7 @@ pub fn prepare_hyprlock(ctx: &CommandContext<'_>, theme_dir: &Path) -> Result<()
     if !hyprlock_theme_dir.is_dir() {
         if !ctx.quiet {
             eprintln!(
-                "theme-manager: hyprlock theme directory not found: {}",
+                "chromacon-style-manager: hyprlock theme directory not found: {}",
                 hyprlock_theme_dir.to_string_lossy()
             );
         }
@@ -58,7 +58,7 @@ pub fn prepare_hyprlock(ctx: &CommandContext<'_>, theme_dir: &Path) -> Result<()
     if !source_config.is_file() {
         if !ctx.quiet {
             eprintln!(
-                "theme-manager: hyprlock theme missing hyprlock.conf in {}",
+                "chromacon-style-manager: hyprlock theme missing hyprlock.conf in {}",
                 hyprlock_theme_dir.to_string_lossy()
             );
         }
@@ -95,7 +95,7 @@ fn apply_omarchy_default_theme_hyprlock(ctx: &CommandContext<'_>, theme_dir: &Pa
     let Some(source_config) = candidates.into_iter().find(|p| p.is_file()) else {
         if !ctx.quiet {
             eprintln!(
-        "theme-manager: omarchy-default hyprlock source not found; expected hyprlock.conf in active theme"
+        "chromacon-style-manager: omarchy-default hyprlock source not found; expected hyprlock.conf in active theme"
       );
         }
         return Ok(());
@@ -120,7 +120,7 @@ fn ensure_main_hyprlock_mode(ctx: &CommandContext<'_>, source_config: &Path) -> 
     if !existing.is_empty() && !existing.contains(CURRENT_THEME_SOURCE_SUFFIX) {
         if !ctx.quiet {
             eprintln!(
-        "theme-manager: warning: preserving custom {}; it does not source current theme hyprlock config",
+        "chromacon-style-manager: warning: preserving custom {}; it does not source current theme hyprlock config",
         hyprlock_main.to_string_lossy()
       );
         }
@@ -176,7 +176,7 @@ pub fn ensure_omarchy_default_theme_link(config: &ResolvedConfig, quiet: bool) -
         SymlinkEnsureResult::Created => {
             if !quiet {
                 println!(
-                    "theme-manager: linked Omarchy default Hyprlock theme {} -> {}",
+                    "chromacon-style-manager: linked Omarchy default Hyprlock theme {} -> {}",
                     link_path.to_string_lossy(),
                     default_theme_dir.to_string_lossy()
                 );
@@ -185,7 +185,7 @@ pub fn ensure_omarchy_default_theme_link(config: &ResolvedConfig, quiet: bool) -
         SymlinkEnsureResult::Updated => {
             if !quiet {
                 println!(
-                    "theme-manager: repaired Omarchy default Hyprlock theme link {} -> {}",
+                    "chromacon-style-manager: repaired Omarchy default Hyprlock theme link {} -> {}",
                     link_path.to_string_lossy(),
                     default_theme_dir.to_string_lossy()
                 );
@@ -194,7 +194,7 @@ pub fn ensure_omarchy_default_theme_link(config: &ResolvedConfig, quiet: bool) -
         SymlinkEnsureResult::SkippedNonSymlink => {
             if !quiet {
                 eprintln!(
-          "theme-manager: warning: preserving non-symlink path {}; cannot link Omarchy default Hyprlock theme",
+          "chromacon-style-manager: warning: preserving non-symlink path {}; cannot link Omarchy default Hyprlock theme",
           link_path.to_string_lossy()
         );
             }
@@ -212,7 +212,7 @@ fn apply_copy(ctx: &CommandContext<'_>, source_config: &Path) -> Result<()> {
     remove_existing(&dest)?;
     if !ctx.quiet {
         println!(
-            "theme-manager: copying hyprlock config {} -> {}",
+            "chromacon-style-manager: copying hyprlock config {} -> {}",
             source_config.to_string_lossy(),
             dest.to_string_lossy()
         );
@@ -229,7 +229,7 @@ fn apply_symlink(ctx: &CommandContext<'_>, source_config: &Path) -> Result<()> {
     remove_existing(&dest)?;
     if !ctx.quiet {
         println!(
-            "theme-manager: linking hyprlock config {} -> {}",
+            "chromacon-style-manager: linking hyprlock config {} -> {}",
             source_config.to_string_lossy(),
             dest.to_string_lossy()
         );
@@ -256,7 +256,7 @@ fn warn_if_hyprlock_source_mismatch(
     let source_ok = content.contains(expected_abs.as_ref()) || content.contains(expected_suffix);
     if !source_ok && !ctx.quiet {
         eprintln!(
-      "theme-manager: warning: {} does not source current theme hyprlock config (expected {})",
+      "chromacon-style-manager: warning: {} does not source current theme hyprlock config (expected {})",
       hyprlock_main.to_string_lossy(),
       expected_target.to_string_lossy()
     );

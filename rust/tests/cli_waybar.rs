@@ -21,7 +21,7 @@ fn waybar_apply_symlink_named() {
     fs::write(waybar_theme.join("config.jsonc"), "cfg").unwrap();
     fs::write(waybar_theme.join("style.css"), "style").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -51,7 +51,7 @@ fn waybar_apply_copy_mode() {
     fs::write(theme_dir.join("config.jsonc"), "cfg").unwrap();
     fs::write(theme_dir.join("style.css"), "style").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -100,7 +100,7 @@ fn waybar_symlink_links_subdirs_and_cleans_up_on_switch() {
     fs::write(alt.join("config.jsonc"), "cfg2").unwrap();
     fs::write(alt.join("style.css"), "style2").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -179,7 +179,7 @@ fn waybar_links_omarchy_default_theme_when_missing() {
     fs::write(omarchy_default.join("config.jsonc"), "omarchy-cfg").unwrap();
     fs::write(omarchy_default.join("style.css"), "omarchy-style").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -229,7 +229,7 @@ fn waybar_repairs_existing_omarchy_default_symlink_target() {
     #[cfg(unix)]
     std::os::unix::fs::symlink(&wrong_default, &link_path).unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -268,7 +268,7 @@ fn waybar_prefers_named_default_over_base_default() {
     fs::write(named_default.join("config.jsonc"), "named-cfg").unwrap();
     fs::write(named_default.join("style.css"), "named-style").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),
@@ -305,7 +305,7 @@ fn waybar_uses_omarchy_root_config_waybar_when_default_waybar_missing_files() {
     fs::write(config_waybar.join("config.jsonc"), "cfg").unwrap();
     fs::write(config_waybar.join("style.css"), "style").unwrap();
 
-    let cfg_dir = env.home.join(".config/theme-manager");
+    let cfg_dir = env.home.join(".config/chromacon-style-manager");
     fs::create_dir_all(&cfg_dir).unwrap();
     write_toml(
         &cfg_dir.join("config.toml"),

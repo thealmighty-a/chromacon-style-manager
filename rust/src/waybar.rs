@@ -10,7 +10,7 @@ use crate::omarchy_defaults::SymlinkEnsureResult;
 use crate::theme_ops::{CommandContext, WaybarMode};
 use walkdir::WalkDir;
 
-const WAYBAR_LINKS_FILE: &str = ".theme-manager-waybar-links";
+const WAYBAR_LINKS_FILE: &str = ".cc-style-waybar-links";
 const OMARCHY_DEFAULT_THEME_NAME: &str = "omarchy-default";
 
 pub fn prepare_waybar(ctx: &CommandContext<'_>, theme_dir: &Path) -> Result<Option<RestartAction>> {
@@ -28,7 +28,7 @@ pub fn prepare_waybar(ctx: &CommandContext<'_>, theme_dir: &Path) -> Result<Opti
     if !waybar_dir.is_dir() {
         if !ctx.quiet {
             eprintln!(
-                "theme-manager: waybar theme directory not found: {}",
+                "chromacon-style-manager: waybar theme directory not found: {}",
                 waybar_dir.to_string_lossy()
             );
         }
@@ -40,7 +40,7 @@ pub fn prepare_waybar(ctx: &CommandContext<'_>, theme_dir: &Path) -> Result<Opti
     if !config_path.is_file() || !style_path.is_file() {
         if !ctx.quiet {
             eprintln!(
-                "theme-manager: waybar theme missing config.jsonc or style.css in {}",
+                "chromacon-style-manager: waybar theme missing config.jsonc or style.css in {}",
                 waybar_dir.to_string_lossy()
             );
         }
@@ -68,7 +68,7 @@ pub fn ensure_omarchy_default_theme_link(config: &ResolvedConfig, quiet: bool) -
         SymlinkEnsureResult::Created => {
             if !quiet {
                 println!(
-                    "theme-manager: linked Omarchy default Waybar theme {} -> {}",
+                    "chromacon-style-manager: linked Omarchy default Waybar theme {} -> {}",
                     link_path.to_string_lossy(),
                     default_theme_dir.to_string_lossy()
                 );
@@ -77,7 +77,7 @@ pub fn ensure_omarchy_default_theme_link(config: &ResolvedConfig, quiet: bool) -
         SymlinkEnsureResult::Updated => {
             if !quiet {
                 println!(
-                    "theme-manager: repaired Omarchy default Waybar theme link {} -> {}",
+                    "chromacon-style-manager: repaired Omarchy default Waybar theme link {} -> {}",
                     link_path.to_string_lossy(),
                     default_theme_dir.to_string_lossy()
                 );
@@ -86,7 +86,7 @@ pub fn ensure_omarchy_default_theme_link(config: &ResolvedConfig, quiet: bool) -
         SymlinkEnsureResult::SkippedNonSymlink => {
             if !quiet {
                 eprintln!(
-          "theme-manager: warning: preserving non-symlink path {}; cannot link Omarchy default Waybar theme",
+          "chromacon-style-manager: warning: preserving non-symlink path {}; cannot link Omarchy default Waybar theme",
           link_path.to_string_lossy()
         );
             }
@@ -109,11 +109,11 @@ fn apply_copy(
 
     if !ctx.quiet {
         println!(
-            "theme-manager: copying waybar config from {}",
+            "chromacon-style-manager: copying waybar config from {}",
             config_path.to_string_lossy()
         );
         println!(
-            "theme-manager: copying waybar style from {}",
+            "chromacon-style-manager: copying waybar style from {}",
             style_path.to_string_lossy()
         );
     }
@@ -164,11 +164,11 @@ fn apply_symlink(
 
     if !ctx.quiet {
         println!(
-            "theme-manager: linking waybar config from {}",
+            "chromacon-style-manager: linking waybar config from {}",
             config_path.to_string_lossy()
         );
         println!(
-            "theme-manager: linking waybar style from {}",
+            "chromacon-style-manager: linking waybar style from {}",
             style_path.to_string_lossy()
         );
     }
@@ -227,7 +227,7 @@ fn cleanup_waybar_links(waybar_dir: &Path, quiet: bool) -> Result<()> {
         }
         if !quiet {
             println!(
-                "theme-manager: removing waybar link {}",
+                "chromacon-style-manager: removing waybar link {}",
                 path.to_string_lossy()
             );
         }
@@ -274,7 +274,7 @@ fn link_waybar_subdirs(
         std::os::unix::fs::symlink(&entry_path, &dest)?;
         if !quiet {
             println!(
-                "theme-manager: linking waybar subdir {}",
+                "chromacon-style-manager: linking waybar subdir {}",
                 dest.to_string_lossy()
             );
         }
@@ -330,7 +330,7 @@ fn copy_waybar_subdirs(
         copy_dir_recursive(&entry_path, &dest)?;
         if !quiet {
             println!(
-                "theme-manager: copying waybar subdir {}",
+                "chromacon-style-manager: copying waybar subdir {}",
                 dest.to_string_lossy()
             );
         }
@@ -402,7 +402,7 @@ fn replace_existing_path(
     let backup_target = unique_backup_target(&backup_root, name)?;
     if !quiet {
         println!(
-            "theme-manager: backing up existing waybar path {} -> {}",
+            "chromacon-style-manager: backing up existing waybar path {} -> {}",
             dest.to_string_lossy(),
             backup_target.to_string_lossy()
         );

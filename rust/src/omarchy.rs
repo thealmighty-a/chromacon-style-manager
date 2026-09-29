@@ -66,14 +66,14 @@ pub fn ensure_awww_daemon(config: &ResolvedConfig, quiet: bool) {
     if !command_exists("awww-daemon") {
         notify_awww_unavailable(quiet);
         if !quiet {
-            eprintln!("theme-manager: awww-daemon not found in PATH");
+            eprintln!("chromacon-style-manager: awww-daemon not found in PATH");
         }
         return;
     }
     if !awww_daemon_running() {
         notify_awww_unavailable(quiet);
         if !quiet {
-            eprintln!("theme-manager: awww-daemon not running; skipping transition");
+            eprintln!("chromacon-style-manager: awww-daemon not running; skipping transition");
         }
     }
 }
@@ -88,7 +88,7 @@ pub fn run_required(cmd: &str, args: &[&str], quiet: bool) -> Result<()> {
 pub fn run_optional(cmd: &str, args: &[&str], quiet: bool) -> Result<()> {
     if !command_exists(cmd) {
         if !quiet {
-            eprintln!("theme-manager: {cmd} not found in PATH");
+            eprintln!("chromacon-style-manager: {cmd} not found in PATH");
         }
         return Ok(());
     }
@@ -347,7 +347,7 @@ fn restart_swayosd(quiet: bool) -> Result<()> {
     let before = pgrep_pids("swayosd-server");
     if let Err(err) = run_omarchy_optional("restart", "swayosd", &[], quiet) {
         if !quiet {
-            eprintln!("theme-manager: swayosd restart command failed: {err}");
+            eprintln!("chromacon-style-manager: swayosd restart command failed: {err}");
         }
     }
     let after = pgrep_pids("swayosd-server");
@@ -402,14 +402,14 @@ fn reload_notifications(quiet: bool) {
 fn reload_swaync(quiet: bool, warn: bool) {
     if !command_exists("swaync-client") {
         if warn && !quiet {
-            eprintln!("theme-manager: swaync reload skipped: swaync-client not found in PATH");
+            eprintln!("chromacon-style-manager: swaync reload skipped: swaync-client not found in PATH");
         }
         return;
     }
 
     if let Err(err) = run_command("swaync-client", &["--reload-config"], quiet) {
         if warn && !quiet {
-            eprintln!("theme-manager: swaync reload skipped: {err}");
+            eprintln!("chromacon-style-manager: swaync reload skipped: {err}");
         }
     }
 }
@@ -417,14 +417,14 @@ fn reload_swaync(quiet: bool, warn: bool) {
 fn reload_mako(quiet: bool, warn: bool) {
     if !command_exists("makoctl") {
         if warn && !quiet {
-            eprintln!("theme-manager: mako reload skipped: makoctl not found in PATH");
+            eprintln!("chromacon-style-manager: mako reload skipped: makoctl not found in PATH");
         }
         return;
     }
 
     if let Err(err) = run_command("makoctl", &["reload"], quiet) {
         if warn && !quiet {
-            eprintln!("theme-manager: mako reload skipped: {err}");
+            eprintln!("chromacon-style-manager: mako reload skipped: {err}");
         }
     }
 }
@@ -480,7 +480,7 @@ fn restart_waybar_exec(config_path: &Path, style_path: &Path, quiet: bool) -> Re
         let mut iter = parts.iter();
         let Some(cmd) = iter.next() else { continue };
         if !quiet {
-            println!("theme-manager: starting waybar via {}", cmd);
+            println!("chromacon-style-manager: starting waybar via {}", cmd);
         }
         let mut command = Command::new(cmd);
         command.args(iter);
@@ -496,20 +496,20 @@ fn restart_waybar_exec(config_path: &Path, style_path: &Path, quiet: bool) -> Re
                             return Ok(());
                         }
                         if !quiet {
-                            eprintln!("theme-manager: waybar restart exited: {status}");
+                            eprintln!("chromacon-style-manager: waybar restart exited: {status}");
                         }
                     }
                     Ok(None) => return Ok(()),
                     Err(err) => {
                         if !quiet {
-                            eprintln!("theme-manager: waybar restart check failed: {err}");
+                            eprintln!("chromacon-style-manager: waybar restart check failed: {err}");
                         }
                     }
                 }
             }
             Err(err) => {
                 if !quiet {
-                    eprintln!("theme-manager: waybar restart spawn failed: {err}");
+                    eprintln!("chromacon-style-manager: waybar restart spawn failed: {err}");
                 }
             }
         }
@@ -567,7 +567,7 @@ pub fn run_awww_transition(config: &ResolvedConfig, quiet: bool, debug_awww: boo
     ];
 
     if debug_awww {
-        eprintln!("theme-manager: awww cmd: awww {}", args.join(" "));
+        eprintln!("chromacon-style-manager: awww cmd: awww {}", args.join(" "));
     }
     match Command::new("awww").args(&args).output() {
         Ok(output) if output.status.success() => Ok(()),
@@ -577,16 +577,16 @@ pub fn run_awww_transition(config: &ResolvedConfig, quiet: bool, debug_awww: boo
             if socket_error {
                 notify_awww_unavailable(quiet);
                 if !quiet {
-                    eprintln!("theme-manager: awww-daemon not running; skipping transition");
+                    eprintln!("chromacon-style-manager: awww-daemon not running; skipping transition");
                 }
             } else if !quiet {
-                eprintln!("theme-manager: awww transition failed");
+                eprintln!("chromacon-style-manager: awww transition failed");
             }
             Ok(())
         }
         Err(err) => {
             if !quiet {
-                eprintln!("theme-manager: awww transition failed: {err}");
+                eprintln!("chromacon-style-manager: awww transition failed: {err}");
             }
             Ok(())
         }
@@ -644,7 +644,7 @@ fn notify_awww_unavailable(quiet: bool) {
     }
     let mut command = Command::new("notify-send");
     command.args([
-        "--app-name=theme-manager",
+        "--app-name=chromacon-style-manager",
         "--urgency=normal",
         "awww-daemon not available",
         "Transitions are disabled until it is running.",

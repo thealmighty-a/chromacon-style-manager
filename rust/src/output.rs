@@ -1,6 +1,6 @@
 pub fn apply_header() {
     println!();
-    println!("== Theme Manager+ Apply ==");
+    println!("== ChromaCon Style Manager ==");
 }
 
 pub fn apply_section(label: &str) {

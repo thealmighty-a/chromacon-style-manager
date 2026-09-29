@@ -2,9 +2,9 @@ use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[command(
-  name = "theme-manager",
+  name = "chromacon-style-manager",
   version = env!("THEME_MANAGER_VERSION"),
-  about = "Theme Manager Plus (Rust)"
+  about = "ChromaCon Style Manager"
 )]
 pub struct Cli {
     #[command(subcommand)]
