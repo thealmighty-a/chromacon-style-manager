@@ -107,7 +107,9 @@ fn try_omarchy_unified(
     quiet: bool,
     emit_stderr: bool,
 ) -> Result<Option<()>> {
-    if !command_exists("omarchy") {
+    // ChromaCon: no unified CLI; helpers are cc-<group>-<cmd> scripts.
+    let _ = (group, cmd, args, quiet, emit_stderr);
+    if true {
         return Ok(None);
     }
     let mut all_args = vec![group, cmd];
@@ -149,7 +151,7 @@ pub fn run_omarchy_optional(group: &str, cmd: &str, args: &[&str], quiet: bool) 
         }
     }
 
-    let legacy = format!("omarchy-{group}-{cmd}");
+    let legacy = format!("cc-{group}-{cmd}");
     if !command_exists(&legacy) {
         return Ok(());
     }
@@ -180,7 +182,7 @@ pub fn run_omarchy_required(group: &str, cmd: &str, args: &[&str], quiet: bool) 
     if try_omarchy_unified(group, cmd, args, quiet, true)?.is_some() {
         return Ok(());
     }
-    let legacy = format!("omarchy-{group}-{cmd}");
+    let legacy = format!("cc-{group}-{cmd}");
     run_required(&legacy, args, quiet)
 }
 
@@ -592,12 +594,12 @@ pub fn run_awww_transition(config: &ResolvedConfig, quiet: bool, debug_awww: boo
 }
 
 pub fn run_theme_hook(theme_name: &str, quiet: bool) -> Result<()> {
-    if command_exists("omarchy-hook") {
-        return run_hook_command("omarchy-hook", &["theme-set", theme_name], quiet);
+    if command_exists("cc-hook") {
+        return run_hook_command("cc-hook", &["theme-set", theme_name], quiet);
     }
 
     let hook_path = PathBuf::from(format!(
-        "{}/.config/omarchy/hooks/theme-set",
+        "{}/.config/cc/hooks/theme-set",
         std::env::var("HOME").unwrap_or_default()
     ));
     run_hook_file(&hook_path, &[theme_name], quiet)

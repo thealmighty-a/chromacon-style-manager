@@ -146,7 +146,7 @@ fn apply_copy(
     )?;
 
     Ok(Some(RestartAction::Command(RestartCommand {
-        cmd: "omarchy-restart-waybar".to_string(),
+        cmd: "cc-restart-waybar".to_string(),
         args: Vec::new(),
     })))
 }
@@ -200,7 +200,7 @@ fn apply_symlink(
     )?;
 
     Ok(Some(RestartAction::Command(RestartCommand {
-        cmd: "omarchy-restart-waybar".to_string(),
+        cmd: "cc-restart-waybar".to_string(),
         args: Vec::new(),
     })))
 }

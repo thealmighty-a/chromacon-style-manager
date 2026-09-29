@@ -10,8 +10,8 @@ use crate::paths::current_theme_name;
 use crate::theme_ops::{CommandContext, HyprlockMode};
 
 const OMARCHY_DEFAULT_THEME_NAME: &str = "omarchy-default";
-const CURRENT_THEME_SOURCE_SUFFIX: &str = "/.config/omarchy/current/theme/hyprlock.conf";
-const MINIMAL_SOURCE_ONLY_HYPRLOCK: &str = r#"source = ~/.config/omarchy/current/theme/hyprlock.conf
+const CURRENT_THEME_SOURCE_SUFFIX: &str = "/.local/state/cc/theme/hyprlock.conf";
+const MINIMAL_SOURCE_ONLY_HYPRLOCK: &str = r#"source = ~/.local/state/cc/theme/hyprlock.conf
 
 general {
     ignore_empty_input = true

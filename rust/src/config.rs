@@ -140,10 +140,10 @@ impl ResolvedConfig {
     }
 
     fn defaults(home: &Path) -> Self {
-        let theme_root_dir = home.join(".config/omarchy/themes");
-        let current_theme_link = home.join(".config/omarchy/current/theme");
-        let current_background_link = home.join(".config/omarchy/current/background");
-        let default_omarchy_bin = home.join(".local/share/omarchy/bin");
+        let theme_root_dir = home.join(".config/cc/themes");
+        let current_theme_link = home.join(".local/state/cc/theme");
+        let current_background_link = home.join(".local/state/cc/background");
+        let default_omarchy_bin = home.join(".local/bin");
         let waybar_dir = home.join(".config/waybar");
         let waybar_themes_dir = waybar_dir.join("themes");
         let walker_dir = home.join(".config/walker");
