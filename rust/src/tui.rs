@@ -129,7 +129,6 @@ struct PickerState {
     filtered_indices: Vec<usize>,
     last_selected: Option<usize>,
     collapsed_groups: std::collections::HashSet<String>,
-    visual_list_state: ListState,
 }
 
 impl PickerState {
@@ -154,7 +153,6 @@ impl PickerState {
             filtered_indices: Vec::new(),
             last_selected: None,
             collapsed_groups: std::collections::HashSet::new(),
-            visual_list_state: ListState::default(),
         }
     }
 }
@@ -1101,9 +1099,9 @@ pub fn browse(config: &ResolvedConfig, quiet: bool) -> Result<Option<BrowseSelec
                         }
 
                         let items_len = match tab {
-                            BrowseTab::Theme => theme_state.filtered_indices.len(),
-                            BrowseTab::Waybar => waybar_state.filtered_indices.len(),
-                            BrowseTab::Walker => walker_state.filtered_indices.len(),
+                            BrowseTab::Theme => nav_len(&theme_items, &theme_state),
+                            BrowseTab::Waybar => nav_len(&waybar_items, &waybar_state),
+                            BrowseTab::Walker => nav_len(&walker_items, &walker_state),
                             BrowseTab::Hyprlock => hyprlock_state.filtered_indices.len(),
                             BrowseTab::Unlock => unlock_state.filtered_indices.len(),
                             BrowseTab::Starship => starship_state.filtered_indices.len(),
@@ -1275,9 +1273,9 @@ pub fn browse(config: &ResolvedConfig, quiet: bool) -> Result<Option<BrowseSelec
                         }
                         MouseEventKind::ScrollUp => {
                             let items_len = match tab {
-                                BrowseTab::Theme => theme_state.filtered_indices.len(),
-                                BrowseTab::Waybar => waybar_state.filtered_indices.len(),
-                                BrowseTab::Walker => walker_state.filtered_indices.len(),
+                                BrowseTab::Theme => nav_len(&theme_items, &theme_state),
+                                BrowseTab::Waybar => nav_len(&waybar_items, &waybar_state),
+                                BrowseTab::Walker => nav_len(&walker_items, &walker_state),
                                 BrowseTab::Hyprlock => hyprlock_state.filtered_indices.len(),
                                 BrowseTab::Unlock => unlock_state.filtered_indices.len(),
                                 BrowseTab::Starship => starship_state.filtered_indices.len(),
@@ -1311,9 +1309,9 @@ pub fn browse(config: &ResolvedConfig, quiet: bool) -> Result<Option<BrowseSelec
                         }
                         MouseEventKind::ScrollDown => {
                             let items_len = match tab {
-                                BrowseTab::Theme => theme_state.filtered_indices.len(),
-                                BrowseTab::Waybar => waybar_state.filtered_indices.len(),
-                                BrowseTab::Walker => walker_state.filtered_indices.len(),
+                                BrowseTab::Theme => nav_len(&theme_items, &theme_state),
+                                BrowseTab::Waybar => nav_len(&waybar_items, &waybar_state),
+                                BrowseTab::Walker => nav_len(&walker_items, &walker_state),
                                 BrowseTab::Hyprlock => hyprlock_state.filtered_indices.len(),
                                 BrowseTab::Unlock => unlock_state.filtered_indices.len(),
                                 BrowseTab::Starship => starship_state.filtered_indices.len(),
@@ -2187,6 +2185,17 @@ fn grouping_active<T: ItemView>(items: &[T], search_query: &str) -> bool {
     search_query.trim().is_empty() && items.iter().any(|item| item.group().is_some())
 }
 
+/// The length `list_state.selected()` should be bounded by for Up/Down/
+/// Home/End navigation: the flattened header+item row count when grouping
+/// is active, otherwise the plain `filtered_indices` count.
+fn nav_len<T: ItemView>(items: &[T], state: &PickerState) -> usize {
+    if grouping_active(items, &state.search_query) {
+        build_display_rows(items, &state.filtered_indices, &state.collapsed_groups).len()
+    } else {
+        state.filtered_indices.len()
+    }
+}
+
 /// Every distinct group name present in `items`.
 fn all_group_names<T: ItemView>(items: &[T]) -> std::collections::HashSet<String> {
     items
@@ -2219,7 +2228,11 @@ fn initial_collapsed_groups<T: ItemView>(
 /// into header + item rows, skipping item rows for collapsed groups while
 /// still showing their header (with a disclosure glyph and count) so they
 /// can be re-expanded.
-fn build_display_rows<T: ItemView>(items: &[T], filtered_indices: &[usize]) -> Vec<DisplayRow> {
+fn build_display_rows<T: ItemView>(
+    items: &[T],
+    filtered_indices: &[usize],
+    collapsed: &std::collections::HashSet<String>,
+) -> Vec<DisplayRow> {
     let visible: std::collections::HashSet<usize> = filtered_indices.iter().copied().collect();
     let mut rows = Vec::new();
     let mut current_group: Option<String> = None;
@@ -2240,10 +2253,11 @@ fn build_display_rows<T: ItemView>(items: &[T], filtered_indices: &[usize]) -> V
                     count,
                 });
             }
-            current_group = group;
+            current_group = group.clone();
             started = true;
         }
-        if visible.contains(&i) {
+        let hidden = group.as_ref().is_some_and(|g| collapsed.contains(g));
+        if visible.contains(&i) && !hidden {
             rows.push(DisplayRow::Item(i));
         }
         i += 1;
@@ -2316,14 +2330,17 @@ fn render_picker<T: ItemView>(
         } else {
             Style::default()
         });
+    // When grouping is active, `state.list_state` indexes into the flattened
+    // header+item row list (built below) rather than directly into
+    // `filtered_indices` — this is what lets Up/Down land on a header row so
+    // it can be expanded/collapsed. `selected_item_index` is the single
+    // place that knows how to go from "whatever list_state.selected() means
+    // right now" to a real item index, in either mode.
     if grouping_active(items, &state.search_query) {
-        let rows = build_display_rows(items, &state.filtered_indices);
-        let selected_real_idx = selected_item_index(state, items.len());
-        let mut visual_selected = None;
+        let rows = build_display_rows(items, &state.filtered_indices, &state.collapsed_groups);
         let list_items: Vec<ListItem> = rows
             .iter()
-            .enumerate()
-            .map(|(visual_idx, row)| match row {
+            .map(|row| match row {
                 DisplayRow::Header { name, count } => {
                     let glyph = if state.collapsed_groups.contains(name) {
                         "\u{25b8}"
@@ -2337,15 +2354,9 @@ fn render_picker<T: ItemView>(
                             .add_modifier(Modifier::BOLD),
                     )))
                 }
-                DisplayRow::Item(idx) => {
-                    if Some(*idx) == selected_real_idx {
-                        visual_selected = Some(visual_idx);
-                    }
-                    ListItem::new(Line::from(items[*idx].label()))
-                }
+                DisplayRow::Item(idx) => ListItem::new(Line::from(items[*idx].label())),
             })
             .collect();
-        state.visual_list_state.select(visual_selected);
         let list = List::new(list_items)
             .block(list_block)
             .highlight_style(
@@ -2354,7 +2365,7 @@ fn render_picker<T: ItemView>(
                     .add_modifier(Modifier::BOLD),
             )
             .highlight_symbol(">> ");
-        frame.render_stateful_widget(list, list_area, &mut state.visual_list_state);
+        frame.render_stateful_widget(list, list_area, &mut state.list_state);
     } else {
         let list_items: Vec<ListItem> = state
             .filtered_indices
@@ -2372,8 +2383,7 @@ fn render_picker<T: ItemView>(
         frame.render_stateful_widget(list, list_area, &mut state.list_state);
     }
 
-    let selected = selected_index(&state.list_state, state.filtered_indices.len());
-    let selected_item = state.filtered_indices.get(selected).copied();
+    let selected_item = selected_item_index(state, items);
     let preview_path = selected_item.and_then(|idx| image_preview(idx));
     let previous_preview_index = state.last_preview_index;
     let previous_preview_path = state.last_preview.clone();
@@ -3006,12 +3016,12 @@ fn tab_index_from_click(ranges: &[(u16, u16, usize)], column: u16) -> Option<usi
 }
 
 fn current_theme_value(items: &[OptionItem], state: &PickerState) -> Option<String> {
-    let index = selected_item_index(state, items.len())?;
+    let index = selected_item_index(state, items)?;
     Some(items[index].value.clone())
 }
 
 fn current_preset_name(items: &[PresetItem], state: &PickerState) -> Option<String> {
-    let index = selected_item_index(state, items.len())?;
+    let index = selected_item_index(state, items)?;
     Some(items[index].name.clone())
 }
 
@@ -3251,7 +3261,7 @@ fn build_preset_entry_from_selection(
 }
 
 fn current_waybar_label(items: &[LabeledItem], state: &PickerState) -> String {
-    let index = match selected_item_index(state, items.len()) {
+    let index = match selected_item_index(state, items) {
         Some(index) => index,
         None => return "No options".to_string(),
     };
@@ -3264,7 +3274,7 @@ fn current_waybar_label(items: &[LabeledItem], state: &PickerState) -> String {
 }
 
 fn current_starship_label(items: &[LabeledItem], state: &PickerState) -> String {
-    let index = match selected_item_index(state, items.len()) {
+    let index = match selected_item_index(state, items) {
         Some(index) => index,
         None => return "No options".to_string(),
     };
@@ -3277,7 +3287,7 @@ fn current_starship_label(items: &[LabeledItem], state: &PickerState) -> String 
 }
 
 fn current_waybar_selection(items: &[LabeledItem], state: &PickerState) -> WaybarSelection {
-    let index = match selected_item_index(state, items.len()) {
+    let index = match selected_item_index(state, items) {
         Some(index) => index,
         None => return WaybarSelection::NoChange,
     };
@@ -3289,7 +3299,7 @@ fn current_waybar_selection(items: &[LabeledItem], state: &PickerState) -> Wayba
 }
 
 fn current_walker_label(items: &[LabeledItem], state: &PickerState) -> String {
-    let index = match selected_item_index(state, items.len()) {
+    let index = match selected_item_index(state, items) {
         Some(index) => index,
         None => return "No options".to_string(),
     };
@@ -3302,7 +3312,7 @@ fn current_walker_label(items: &[LabeledItem], state: &PickerState) -> String {
 }
 
 fn current_walker_selection(items: &[LabeledItem], state: &PickerState) -> WalkerSelection {
-    let index = match selected_item_index(state, items.len()) {
+    let index = match selected_item_index(state, items) {
         Some(index) => index,
         None => return WalkerSelection::NoChange,
     };
@@ -3314,7 +3324,7 @@ fn current_walker_selection(items: &[LabeledItem], state: &PickerState) -> Walke
 }
 
 fn current_hyprlock_label(items: &[LabeledItem], state: &PickerState) -> String {
-    let index = match selected_item_index(state, items.len()) {
+    let index = match selected_item_index(state, items) {
         Some(index) => index,
         None => return "No options".to_string(),
     };
@@ -3327,7 +3337,7 @@ fn current_hyprlock_label(items: &[LabeledItem], state: &PickerState) -> String 
 }
 
 fn current_hyprlock_selection(items: &[LabeledItem], state: &PickerState) -> HyprlockSelection {
-    let index = match selected_item_index(state, items.len()) {
+    let index = match selected_item_index(state, items) {
         Some(index) => index,
         None => return HyprlockSelection::NoChange,
     };
@@ -3339,7 +3349,7 @@ fn current_hyprlock_selection(items: &[LabeledItem], state: &PickerState) -> Hyp
 }
 
 fn current_unlock_label(items: &[LabeledItem], state: &PickerState) -> String {
-    let index = match selected_item_index(state, items.len()) {
+    let index = match selected_item_index(state, items) {
         Some(index) => index,
         None => return "No options".to_string(),
     };
@@ -3352,7 +3362,7 @@ fn current_unlock_label(items: &[LabeledItem], state: &PickerState) -> String {
 }
 
 fn current_unlock_selection(items: &[LabeledItem], state: &PickerState) -> UnlockSelection {
-    let index = match selected_item_index(state, items.len()) {
+    let index = match selected_item_index(state, items) {
         Some(index) => index,
         None => return UnlockSelection::NoChange,
     };
@@ -3368,7 +3378,7 @@ fn current_starship_selection(
     state: &PickerState,
     theme_path: &Path,
 ) -> StarshipSelection {
-    let index = match selected_item_index(state, items.len()) {
+    let index = match selected_item_index(state, items) {
         Some(index) => index,
         None => return StarshipSelection::NoChange,
     };
@@ -3381,7 +3391,7 @@ fn current_starship_selection(
 }
 
 fn selected_item_key(items: &[LabeledItem], state: &PickerState) -> Option<(String, String)> {
-    let index = selected_item_index(state, items.len())?;
+    let index = selected_item_index(state, items)?;
     Some((items[index].kind.clone(), items[index].value.clone()))
 }
 
@@ -3419,19 +3429,9 @@ fn reset_picker_cache(state: &mut PickerState) {
     state.force_clear = true;
 }
 
-fn filter_item_indices<T: ItemView>(
-    items: &[T],
-    query: &str,
-    collapsed: &std::collections::HashSet<String>,
-) -> Vec<usize> {
+fn filter_item_indices<T: ItemView>(items: &[T], query: &str) -> Vec<usize> {
     if query.trim().is_empty() {
-        return (0..items.len())
-            .filter(|&idx| {
-                items[idx]
-                    .group()
-                    .map_or(true, |g| !collapsed.contains(g))
-            })
-            .collect();
+        return (0..items.len()).collect();
     }
     let mut scored: Vec<(i64, usize, String)> = Vec::new();
     for (idx, item) in items.iter().enumerate() {
@@ -3513,25 +3513,64 @@ fn is_word_boundary(chars: &[char], idx: usize) -> bool {
     !chars[idx.saturating_sub(1)].is_alphanumeric()
 }
 
-fn selected_item_index(state: &PickerState, len: usize) -> Option<usize> {
-    let idx = if !state.filtered_indices.is_empty() {
+/// Resolves "whatever `state.list_state.selected()` currently means" to a
+/// real item index. When grouping is active, `list_state` indexes into the
+/// flattened header+item row list (so Up/Down can reach a header); landing
+/// on a header has no real item, so it falls back to the last real item that
+/// was selected (keeps the preview panes showing something sensible while
+/// browsing past a header). When grouping isn't active, it indexes into
+/// `filtered_indices` directly, exactly as before groups existed.
+fn selected_item_index<T: ItemView>(state: &PickerState, items: &[T]) -> Option<usize> {
+    let idx = if grouping_active(items, &state.search_query) {
+        let rows = build_display_rows(items, &state.filtered_indices, &state.collapsed_groups);
+        if rows.is_empty() {
+            state.last_selected
+        } else {
+            let pos = selected_index(&state.list_state, rows.len());
+            match rows.get(pos) {
+                Some(DisplayRow::Item(idx)) => Some(*idx),
+                _ => state.last_selected,
+            }
+        }
+    } else if !state.filtered_indices.is_empty() {
         let selected = selected_index(&state.list_state, state.filtered_indices.len());
         state.filtered_indices.get(selected).copied()
     } else {
         state.last_selected
     };
     match idx {
-        Some(idx) if idx < len => Some(idx),
+        Some(idx) if idx < items.len() => Some(idx),
         _ => None,
     }
 }
 
 fn rebuild_filtered<T: ItemView>(state: &mut PickerState, items: &[T]) {
-    let previous = selected_item_index(state, items.len());
-    state.filtered_indices =
-        filter_item_indices(items, &state.search_query, &state.collapsed_groups);
+    let previous = selected_item_index(state, items);
+    state.filtered_indices = filter_item_indices(items, &state.search_query);
     let query_changed = state.search_query != state.last_query;
     state.last_query = state.search_query.clone();
+
+    if grouping_active(items, &state.search_query) {
+        let rows = build_display_rows(items, &state.filtered_indices, &state.collapsed_groups);
+        if let Some(item_index) = previous {
+            if let Some(pos) = rows
+                .iter()
+                .position(|row| matches!(row, DisplayRow::Item(idx) if *idx == item_index))
+            {
+                state.list_state.select(Some(pos));
+                state.last_selected = Some(item_index);
+                return;
+            }
+        }
+        ensure_selected(&mut state.list_state, rows.len());
+        if let Some(DisplayRow::Item(idx)) =
+            rows.get(selected_index(&state.list_state, rows.len()))
+        {
+            state.last_selected = Some(*idx);
+        }
+        return;
+    }
+
     if query_changed && !state.search_query.trim().is_empty() {
         ensure_selected(&mut state.list_state, state.filtered_indices.len());
         if let Some(selected) = state.filtered_indices.first().copied() {
@@ -3564,22 +3603,44 @@ fn rebuild_filtered<T: ItemView>(state: &mut PickerState, items: &[T]) {
     }
 }
 
-/// Collapse (or expand) the group the currently selected item belongs to.
-/// A no-op if the current item isn't in a group.
+/// Collapse (or expand) whatever group is currently reachable: the header
+/// itself if `list_state` is parked on one, otherwise the group of the
+/// currently selected item. A no-op outside a group.
 fn toggle_group_collapse<T: ItemView>(state: &mut PickerState, items: &[T], collapse: bool) {
-    let Some(idx) = selected_item_index(state, items.len()) else {
+    if !grouping_active(items, &state.search_query) {
+        return;
+    }
+    let rows = build_display_rows(items, &state.filtered_indices, &state.collapsed_groups);
+    if rows.is_empty() {
+        return;
+    }
+    let pos = selected_index(&state.list_state, rows.len());
+    let (group, was_header) = match rows.get(pos) {
+        Some(DisplayRow::Header { name, .. }) => (Some(name.clone()), true),
+        Some(DisplayRow::Item(idx)) => (items[*idx].group().map(|g| g.to_string()), false),
+        None => (None, false),
+    };
+    let Some(group) = group else {
         return;
     };
-    let Some(group) = items[idx].group() else {
-        return;
-    };
-    let group = group.to_string();
     if collapse {
-        state.collapsed_groups.insert(group);
+        state.collapsed_groups.insert(group.clone());
     } else {
         state.collapsed_groups.remove(&group);
     }
     rebuild_filtered(state, items);
+    if was_header {
+        // rebuild_filtered only knows how to restore a real item selection;
+        // when a header was toggled, stay parked on that same header rather
+        // than snapping to whatever real item it falls back to.
+        let new_rows = build_display_rows(items, &state.filtered_indices, &state.collapsed_groups);
+        if let Some(new_pos) = new_rows
+            .iter()
+            .position(|row| matches!(row, DisplayRow::Header { name, .. } if *name == group))
+        {
+            state.list_state.select(Some(new_pos));
+        }
+    }
 }
 
 fn ensure_selected(state: &mut ListState, len: usize) {
@@ -3676,11 +3737,11 @@ fn handle_list_mouse_click<T: ItemView>(
     } else if list_inner.contains(position) {
         state.focus = FocusArea::List;
         if grouping_active(items, &state.search_query) {
-            let rows = build_display_rows(items, &state.filtered_indices);
+            let rows = build_display_rows(items, &state.filtered_indices, &state.collapsed_groups);
             if list_inner.height == 0 {
                 return;
             }
-            let offset = state.visual_list_state.offset();
+            let offset = state.list_state.offset();
             let relative = position.y.saturating_sub(list_inner.y) as usize;
             let clicked = offset.saturating_add(relative);
             match rows.get(clicked) {
@@ -3693,10 +3754,8 @@ fn handle_list_mouse_click<T: ItemView>(
                     }
                     rebuild_filtered(state, items);
                 }
-                Some(DisplayRow::Item(idx)) => {
-                    if let Some(pos) = state.filtered_indices.iter().position(|&i| i == *idx) {
-                        state.list_state.select(Some(pos));
-                    }
+                Some(DisplayRow::Item(_)) => {
+                    state.list_state.select(Some(clicked));
                 }
                 None => {}
             }
@@ -4082,7 +4141,7 @@ mod tests {
                 label: "charlie".to_string(),
             },
         ];
-        let filtered = filter_item_indices(&items, "", &std::collections::HashSet::new());
+        let filtered = filter_item_indices(&items, "");
         assert_eq!(filtered, vec![0, 1, 2]);
     }
 
@@ -4099,7 +4158,7 @@ mod tests {
                 label: "charlie".to_string(),
             },
         ];
-        let filtered = filter_item_indices(&items, "br", &std::collections::HashSet::new());
+        let filtered = filter_item_indices(&items, "br");
         assert_eq!(filtered, vec![1]);
     }
 
@@ -4135,7 +4194,7 @@ mod tests {
                 label: "nord".to_string(),
             },
         ];
-        let filtered = filter_item_indices(&items, "dra", &std::collections::HashSet::new());
+        let filtered = filter_item_indices(&items, "dra");
         assert_eq!(filtered, vec![0]);
     }
 
@@ -4149,7 +4208,7 @@ mod tests {
                 label: "nord".to_string(),
             },
         ];
-        let filtered = filter_item_indices(&items, "drc", &std::collections::HashSet::new());
+        let filtered = filter_item_indices(&items, "drc");
         assert_eq!(filtered, vec![0]);
     }
 
@@ -4390,36 +4449,22 @@ mod tests {
     }
 
     #[test]
-    fn filter_item_indices_excludes_collapsed_group_when_query_empty() {
+    fn filter_item_indices_is_unaffected_by_collapsed_groups() {
+        // Hiding collapsed-group items is build_display_rows' job now, not
+        // filter_item_indices' — this is what lets a collapsed group's
+        // header still report an accurate item count.
         let items = grouped_fixture();
-        let mut collapsed = std::collections::HashSet::new();
-        collapsed.insert("atif".to_string());
-        let filtered = filter_item_indices(&items, "", &collapsed);
-        // Ungrouped item (0) and the "cc" group's item (3) remain; "atif" (1, 2) is hidden.
-        assert_eq!(filtered, vec![0, 3]);
-    }
-
-    #[test]
-    fn filter_item_indices_ignores_collapsed_groups_while_searching() {
-        let items = grouped_fixture();
-        let mut collapsed = std::collections::HashSet::new();
-        collapsed.insert("atif".to_string());
-        let filtered = filter_item_indices(&items, "atif", &collapsed);
-        // Search bypasses collapse entirely: both atif items should be found.
-        assert!(filtered.contains(&1));
-        assert!(filtered.contains(&2));
+        let filtered = filter_item_indices(&items, "");
+        assert_eq!(filtered, vec![0, 1, 2, 3]);
     }
 
     #[test]
     fn build_display_rows_inserts_header_per_group_and_skips_collapsed_items() {
         let items = grouped_fixture();
-        let collapsed = {
-            let mut set = std::collections::HashSet::new();
-            set.insert("atif".to_string());
-            set
-        };
-        let filtered = filter_item_indices(&items, "", &collapsed);
-        let rows = build_display_rows(&items, &filtered);
+        let mut collapsed = std::collections::HashSet::new();
+        collapsed.insert("atif".to_string());
+        let filtered = filter_item_indices(&items, "");
+        let rows = build_display_rows(&items, &filtered, &collapsed);
 
         // Expected shape: ungrouped item 0, "atif" header (still shown even
         // though collapsed, with no item rows under it), "cc" header, item 3.
@@ -4434,8 +4479,8 @@ mod tests {
     fn build_display_rows_shows_items_for_expanded_groups() {
         let items = grouped_fixture();
         let collapsed = std::collections::HashSet::new();
-        let filtered = filter_item_indices(&items, "", &collapsed);
-        let rows = build_display_rows(&items, &filtered);
+        let filtered = filter_item_indices(&items, "");
+        let rows = build_display_rows(&items, &filtered, &collapsed);
 
         // Ungrouped item, "atif" header + its 2 items, "cc" header + its item.
         assert_eq!(rows.len(), 6);
@@ -4445,6 +4490,53 @@ mod tests {
         assert!(matches!(&rows[3], DisplayRow::Item(2)));
         assert!(matches!(&rows[4], DisplayRow::Header { name, .. } if name == "cc"));
         assert!(matches!(&rows[5], DisplayRow::Item(3)));
+    }
+
+    #[test]
+    fn toggle_group_collapse_works_when_parked_on_the_header_itself() {
+        let items = grouped_fixture();
+        let mut state = PickerState::new();
+        rebuild_filtered(&mut state, &items);
+        // Navigate to the "atif" header: ungrouped item (row 0), then header (row 1).
+        state.list_state.select(Some(1));
+        toggle_group_collapse(&mut state, &items, true);
+        assert!(state.collapsed_groups.contains("atif"));
+
+        toggle_group_collapse(&mut state, &items, false);
+        assert!(!state.collapsed_groups.contains("atif"));
+    }
+
+    #[test]
+    fn down_arrow_navigation_reaches_a_header_row() {
+        // Regression test: Up/Down must be able to land on a header row at
+        // all (via the same `nav_len` + `next_index` combo the event loop
+        // uses), otherwise there's no way to select a group to expand it.
+        let items = grouped_fixture();
+        let mut state = PickerState::new();
+        rebuild_filtered(&mut state, &items);
+        assert!(matches!(state.list_state.selected(), Some(0)));
+
+        let len = nav_len(&items, &state);
+        let next = next_index(state.list_state.selected(), len);
+        state.list_state.select(Some(next));
+
+        let rows = build_display_rows(&items, &state.filtered_indices, &state.collapsed_groups);
+        assert!(matches!(&rows[next], DisplayRow::Header { name, .. } if name == "atif"));
+    }
+
+    #[test]
+    fn selected_item_index_falls_back_to_last_selected_when_parked_on_a_header() {
+        let items = grouped_fixture();
+        let mut state = PickerState::new();
+        rebuild_filtered(&mut state, &items);
+        assert_eq!(selected_item_index(&state, &items), Some(0));
+
+        // Move onto the "atif" header row.
+        state.list_state.select(Some(1));
+        // No real item is selected while parked on a header, so this should
+        // keep reporting the last real selection rather than None/garbage —
+        // that's what keeps the preview panes showing something sensible.
+        assert_eq!(selected_item_index(&state, &items), Some(0));
     }
 
     #[test]
