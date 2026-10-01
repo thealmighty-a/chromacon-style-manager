@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::config::ResolvedConfig;
-use crate::paths::{is_symlink, normalize_theme_name};
+use crate::paths::normalize_theme_name;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PresetFile {
@@ -167,14 +167,17 @@ pub fn summarize_preset(config: &ResolvedConfig, name: &str, entry: &PresetEntry
 
     if let Some(theme_name) = theme.as_ref() {
         let normalized = normalize_theme_name(theme_name);
-        let theme_path = config.theme_root_dir.join(&normalized);
-        if is_broken_theme(&theme_path) {
-            errors.push(format!("theme not found: {normalized}"));
-        }
-        if matches!(starship_value, PresetStarshipValue::Theme) {
-            let starship_path = theme_path.join("starship.toml");
-            if !starship_path.is_file() {
-                errors.push("theme starship.toml not found".to_string());
+        match crate::theme_ops::resolve_theme_path(config, &normalized) {
+            Ok(theme_path) => {
+                if matches!(starship_value, PresetStarshipValue::Theme) {
+                    let starship_path = theme_path.join("starship.toml");
+                    if !starship_path.is_file() {
+                        errors.push("theme starship.toml not found".to_string());
+                    }
+                }
+            }
+            Err(_) => {
+                errors.push(format!("theme not found: {normalized}"));
             }
         }
     }
@@ -295,16 +298,6 @@ fn parse_starship(
             PresetStarshipValue::None
         }
     }
-}
-
-fn is_broken_theme(path: &Path) -> bool {
-    if path.is_dir() {
-        return false;
-    }
-    if let Ok(true) = is_symlink(path) {
-        return fs::metadata(path).is_err();
-    }
-    true
 }
 
 fn format_waybar(value: &PresetWaybarValue) -> String {

@@ -3025,34 +3025,52 @@ fn current_preset_name(items: &[PresetItem], state: &PickerState) -> Option<Stri
     Some(items[index].name.clone())
 }
 
-fn select_option_by_value(state: &mut PickerState, items: &[OptionItem], value: &str) -> bool {
-    if let Some(item_index) = items.iter().position(|item| item.value == value) {
-        if let Some(filtered_pos) = state
-            .filtered_indices
+/// Points `state.list_state` at the real item index `item_index`, correctly
+/// accounting for whichever domain `list_state` currently indexes into
+/// (flattened header+item rows when grouping is active, `filtered_indices`
+/// otherwise — see `selected_item_index`). If the item lives in a currently
+/// collapsed group, that group is expanded first so the item is actually
+/// reachable — e.g. loading a preset whose waybar/theme happens to live in
+/// a group you haven't looked at yet should still show and select it.
+fn select_real_item<T: ItemView>(state: &mut PickerState, items: &[T], item_index: usize) -> bool {
+    if item_index >= items.len() {
+        return false;
+    }
+    if let Some(group) = items[item_index].group() {
+        state.collapsed_groups.remove(group);
+    }
+    if grouping_active(items, &state.search_query) {
+        let rows = build_display_rows(items, &state.filtered_indices, &state.collapsed_groups);
+        if let Some(pos) = rows
             .iter()
-            .position(|&idx| idx == item_index)
+            .position(|row| matches!(row, DisplayRow::Item(idx) if *idx == item_index))
         {
-            state.list_state.select(Some(filtered_pos));
+            state.list_state.select(Some(pos));
             state.last_selected = Some(item_index);
             return true;
         }
+        return false;
+    }
+    if let Some(pos) = state.filtered_indices.iter().position(|&idx| idx == item_index) {
+        state.list_state.select(Some(pos));
+        state.last_selected = Some(item_index);
+        return true;
     }
     false
 }
 
-fn select_preset_by_name(state: &mut PickerState, items: &[PresetItem], name: &str) -> bool {
-    if let Some(item_index) = items.iter().position(|item| item.name == name) {
-        if let Some(filtered_pos) = state
-            .filtered_indices
-            .iter()
-            .position(|&idx| idx == item_index)
-        {
-            state.list_state.select(Some(filtered_pos));
-            state.last_selected = Some(item_index);
-            return true;
-        }
+fn select_option_by_value(state: &mut PickerState, items: &[OptionItem], value: &str) -> bool {
+    match items.iter().position(|item| item.value == value) {
+        Some(item_index) => select_real_item(state, items, item_index),
+        None => false,
     }
-    false
+}
+
+fn select_preset_by_name(state: &mut PickerState, items: &[PresetItem], name: &str) -> bool {
+    match items.iter().position(|item| item.name == name) {
+        Some(item_index) => select_real_item(state, items, item_index),
+        None => false,
+    }
 }
 
 fn preset_waybar_key(preset: &presets::PresetDefinition) -> Option<(String, String)> {
@@ -3139,22 +3157,14 @@ fn apply_preset_to_states(
     select_item_by_key(walker_state, walker_items, preset_walker_key(&preset));
     select_item_by_key(hyprlock_state, hyprlock_items, preset_hyprlock_key(&preset));
     select_item_by_key(starship_state, starship_items, preset_starship_key(&preset));
-    ensure_selected(
-        &mut waybar_state.list_state,
-        waybar_state.filtered_indices.len(),
-    );
-    ensure_selected(
-        &mut walker_state.list_state,
-        walker_state.filtered_indices.len(),
-    );
-    ensure_selected(
-        &mut hyprlock_state.list_state,
-        hyprlock_state.filtered_indices.len(),
-    );
-    ensure_selected(
-        &mut starship_state.list_state,
-        starship_state.filtered_indices.len(),
-    );
+    let waybar_len = nav_len(waybar_items, waybar_state);
+    let walker_len = nav_len(walker_items, walker_state);
+    let hyprlock_len = nav_len(hyprlock_items, hyprlock_state);
+    let starship_len = nav_len(starship_items, starship_state);
+    ensure_selected(&mut waybar_state.list_state, waybar_len);
+    ensure_selected(&mut walker_state.list_state, walker_len);
+    ensure_selected(&mut hyprlock_state.list_state, hyprlock_len);
+    ensure_selected(&mut starship_state.list_state, starship_len);
 
     Ok(())
 }
@@ -3405,14 +3415,7 @@ fn select_item_by_key(
             .iter()
             .position(|item| item.kind == kind && item.value == value)
         {
-            if let Some(filtered_pos) = state
-                .filtered_indices
-                .iter()
-                .position(|&idx| idx == item_index)
-            {
-                state.list_state.select(Some(filtered_pos));
-                state.last_selected = Some(item_index);
-            }
+            select_real_item(state, items, item_index);
         }
     }
 }
