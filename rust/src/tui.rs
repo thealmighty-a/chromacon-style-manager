@@ -374,12 +374,15 @@ pub fn browse(config: &ResolvedConfig, quiet: bool) -> Result<Option<BrowseSelec
     let mut preset_save_input = String::new();
 
     let mut theme_state = PickerState::new();
+    let initial_theme_value = crate::paths::current_theme_name(&config.current_theme_link)
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| NO_THEME_CHANGE_VALUE.to_string());
+    // Groups start collapsed, except whichever one holds the already-active
+    // theme, so the current selection is visible without extra keystrokes.
+    theme_state.collapsed_groups = initial_collapsed_groups(&theme_items, Some(&initial_theme_value));
     rebuild_filtered(&mut theme_state, &theme_items);
-    if let Ok(Some(current)) = crate::paths::current_theme_name(&config.current_theme_link) {
-        select_option_by_value(&mut theme_state, &theme_items, &current);
-    } else {
-        select_option_by_value(&mut theme_state, &theme_items, NO_THEME_CHANGE_VALUE);
-    }
+    select_option_by_value(&mut theme_state, &theme_items, &initial_theme_value);
     let mut selected_theme = current_theme_value(&theme_items, &theme_state)
         .ok_or_else(|| anyhow!("no themes available"))?;
     let mut theme_path = resolve_theme_path_for_selection(config, &selected_theme)?;
@@ -394,6 +397,10 @@ pub fn browse(config: &ResolvedConfig, quiet: bool) -> Result<Option<BrowseSelec
     let mut hyprlock_state = PickerState::new();
     let mut unlock_state = PickerState::new();
     let mut starship_state = PickerState::new();
+    // Waybar/Walker always start on their ungrouped "No change" option, so
+    // every group can safely start collapsed with nothing hidden from view.
+    waybar_state.collapsed_groups = all_group_names(&waybar_items);
+    walker_state.collapsed_groups = all_group_names(&walker_items);
     rebuild_filtered(&mut waybar_state, &waybar_items);
     rebuild_filtered(&mut walker_state, &walker_items);
     rebuild_filtered(&mut hyprlock_state, &hyprlock_items);
@@ -2178,6 +2185,34 @@ enum DisplayRow {
 /// so results are never hidden).
 fn grouping_active<T: ItemView>(items: &[T], search_query: &str) -> bool {
     search_query.trim().is_empty() && items.iter().any(|item| item.group().is_some())
+}
+
+/// Every distinct group name present in `items`.
+fn all_group_names<T: ItemView>(items: &[T]) -> std::collections::HashSet<String> {
+    items
+        .iter()
+        .filter_map(|item| item.group().map(|g| g.to_string()))
+        .collect()
+}
+
+/// Starting collapsed-groups set: every group collapsed, except the one
+/// containing `active_value` (if any) so whatever is already selected stays
+/// visible without the user having to go find and expand it first.
+fn initial_collapsed_groups<T: ItemView>(
+    items: &[T],
+    active_value: Option<&str>,
+) -> std::collections::HashSet<String> {
+    let mut collapsed = all_group_names(items);
+    if let Some(value) = active_value {
+        if let Some(group) = items
+            .iter()
+            .find(|item| item.value() == value)
+            .and_then(|item| item.group())
+        {
+            collapsed.remove(group);
+        }
+    }
+    collapsed
 }
 
 /// Flattens `items` (already sorted so same-group entries are contiguous)
@@ -3985,6 +4020,9 @@ trait ItemView {
     fn group(&self) -> Option<&str> {
         None
     }
+    fn value(&self) -> &str {
+        ""
+    }
 }
 
 impl ItemView for OptionItem {
@@ -3994,11 +4032,17 @@ impl ItemView for OptionItem {
     fn group(&self) -> Option<&str> {
         self.group.as_deref()
     }
+    fn value(&self) -> &str {
+        &self.value
+    }
 }
 
 impl ItemView for LabeledItem {
     fn label(&self) -> String {
         self.label.clone()
+    }
+    fn value(&self) -> &str {
+        &self.value
     }
     fn group(&self) -> Option<&str> {
         self.group.as_deref()
@@ -4283,6 +4327,9 @@ mod tests {
         fn group(&self) -> Option<&str> {
             self.group.as_deref()
         }
+        fn value(&self) -> &str {
+            &self.label
+        }
     }
 
     fn grouped_fixture() -> Vec<GroupedDummyItem> {
@@ -4306,6 +4353,40 @@ mod tests {
                 group: Some("cc".to_string()),
             },
         ]
+    }
+
+    #[test]
+    fn all_group_names_collects_every_distinct_group() {
+        let items = grouped_fixture();
+        let groups = all_group_names(&items);
+        assert_eq!(groups.len(), 2);
+        assert!(groups.contains("atif"));
+        assert!(groups.contains("cc"));
+    }
+
+    #[test]
+    fn initial_collapsed_groups_collapses_everything_without_an_active_value() {
+        let items = grouped_fixture();
+        let collapsed = initial_collapsed_groups(&items, None);
+        assert_eq!(collapsed.len(), 2);
+        assert!(collapsed.contains("atif"));
+        assert!(collapsed.contains("cc"));
+    }
+
+    #[test]
+    fn initial_collapsed_groups_leaves_the_active_items_group_expanded() {
+        let items = grouped_fixture();
+        let collapsed = initial_collapsed_groups(&items, Some("atif-pill"));
+        assert_eq!(collapsed.len(), 1);
+        assert!(collapsed.contains("cc"));
+        assert!(!collapsed.contains("atif"));
+    }
+
+    #[test]
+    fn initial_collapsed_groups_collapses_all_when_active_value_is_ungrouped() {
+        let items = grouped_fixture();
+        let collapsed = initial_collapsed_groups(&items, Some("none"));
+        assert_eq!(collapsed.len(), 2);
     }
 
     #[test]
