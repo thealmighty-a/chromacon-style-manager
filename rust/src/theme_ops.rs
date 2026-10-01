@@ -250,26 +250,16 @@ pub fn list_theme_entries(theme_root: &Path) -> Result<Vec<String>> {
     Ok(entries)
 }
 
+/// Flat list of theme names (bare names, no group info) — for callers that
+/// just need every available theme regardless of how it's organized on disk,
+/// e.g. the `list` and `next` CLI commands. Delegates to the same one-level
+/// group-aware discovery `list_theme_entries_with_groups` uses, so a theme
+/// nested under an organizational group folder still shows up here.
 pub fn list_theme_entries_for_config(config: &ResolvedConfig) -> Result<Vec<String>> {
-    let mut entries = Vec::new();
-    let mut seen = HashSet::new();
-    for root in theme_roots(config) {
-        if !root.is_dir() {
-            continue;
-        }
-        for entry in fs::read_dir(&root)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() || is_symlink(&path)? {
-                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if seen.insert(name.to_string()) {
-                        entries.push(name.to_string());
-                    }
-                }
-            }
-        }
-    }
-    Ok(entries)
+    Ok(list_theme_entries_with_groups(config)?
+        .into_iter()
+        .map(|entry| entry.name)
+        .collect())
 }
 
 fn sorted_theme_entries_for_config(config: &ResolvedConfig) -> Result<Vec<String>> {
@@ -394,8 +384,16 @@ pub fn list_theme_entries_with_groups(config: &ResolvedConfig) -> Result<Vec<Gro
     Ok(out)
 }
 
+/// A directory counts as a theme if it has at least one regular file
+/// directly inside it (not just subdirectories). A pure organizational group
+/// folder (e.g. themes/<group>/) holds only further theme folders and no
+/// loose files of its own, so this cleanly tells the two apart without
+/// requiring every theme to ship a specific marker file (some don't, e.g.
+/// ones with no colors.toml).
 fn is_theme_dir(path: &Path) -> bool {
-    path.join("colors.toml").is_file()
+    fs::read_dir(path)
+        .map(|entries| entries.flatten().any(|entry| entry.path().is_file()))
+        .unwrap_or(false)
 }
 
 fn theme_roots(config: &ResolvedConfig) -> Vec<PathBuf> {
@@ -653,12 +651,23 @@ mod grouping_tests {
     }
 
     #[test]
-    fn is_theme_dir_requires_colors_toml() {
+    fn is_theme_dir_requires_a_direct_file() {
         let temp = TempDir::new().unwrap();
         let theme_dir = temp.path().join("theme");
         fs::create_dir_all(&theme_dir).unwrap();
         assert!(!is_theme_dir(&theme_dir));
-        fs::write(theme_dir.join("colors.toml"), "").unwrap();
+        // A theme without colors.toml (just some other direct file) still counts.
+        fs::write(theme_dir.join("hyprland.conf"), "").unwrap();
         assert!(is_theme_dir(&theme_dir));
+    }
+
+    #[test]
+    fn is_theme_dir_rejects_pure_container_folder() {
+        let temp = TempDir::new().unwrap();
+        let group_dir = temp.path().join("group");
+        fs::create_dir_all(group_dir.join("nested-theme")).unwrap();
+        fs::write(group_dir.join("nested-theme").join("colors.toml"), "").unwrap();
+        // The group folder itself has no direct files, only a subdirectory.
+        assert!(!is_theme_dir(&group_dir));
     }
 }
