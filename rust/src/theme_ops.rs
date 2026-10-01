@@ -284,8 +284,118 @@ pub fn resolve_theme_path(config: &ResolvedConfig, normalized: &str) -> Result<P
         if candidate.is_dir() || is_symlink(&candidate)? {
             return Ok(candidate);
         }
+        // Not found directly under this root: the theme may live one level
+        // down inside an organizational group folder (e.g. themes/<group>/<name>).
+        if let Ok(group_dirs) = fs::read_dir(&root) {
+            for group_dir in group_dirs.flatten() {
+                let group_path = group_dir.path();
+                if !group_path.is_dir() {
+                    continue;
+                }
+                let nested = group_path.join(normalized);
+                if nested.is_dir() || is_symlink(&nested).unwrap_or(false) {
+                    return Ok(nested);
+                }
+            }
+        }
     }
     Err(anyhow!("theme not found: {normalized}"))
+}
+
+/// Resolve a bare theme name to its directory under `themes_dir`, falling back
+/// to a one-level-nested group folder (`themes_dir/<group>/<name>`) when the
+/// theme isn't directly under `themes_dir`. Used by apply-time code that only
+/// has a stored name (CLI flags, presets.toml) and needs the real directory
+/// regardless of whether the theme has since been organized into a group.
+pub fn resolve_named_theme_dir(themes_dir: &Path, name: &str) -> PathBuf {
+    let direct = themes_dir.join(name);
+    if direct.is_dir() {
+        return direct;
+    }
+    if let Ok(entries) = fs::read_dir(themes_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let candidate = path.join(name);
+                if candidate.is_dir() {
+                    return candidate;
+                }
+            }
+        }
+    }
+    direct
+}
+
+/// A theme/entry discovered under a themes directory, optionally nested one
+/// level inside an organizational group folder.
+#[derive(Debug, Clone)]
+pub struct GroupedEntry {
+    pub name: String,
+    pub group: Option<String>,
+    pub path: PathBuf,
+}
+
+/// Like `list_theme_entries_for_config`, but also resolves one level of group
+/// subfolders (a folder that isn't itself a theme, containing theme folders).
+/// A directory counts as a theme if it has `colors.toml` directly inside it.
+pub fn list_theme_entries_with_groups(config: &ResolvedConfig) -> Result<Vec<GroupedEntry>> {
+    let mut out = Vec::new();
+    let mut seen = HashSet::new();
+    for root in theme_roots(config) {
+        if !root.is_dir() {
+            continue;
+        }
+        for entry in fs::read_dir(&root)? {
+            let entry = entry?;
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            if is_theme_dir(&path) {
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if seen.insert(name.to_string()) {
+                        out.push(GroupedEntry {
+                            name: name.to_string(),
+                            group: None,
+                            path: path.clone(),
+                        });
+                    }
+                }
+                continue;
+            }
+            let Some(group_name) = path.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+            if let Ok(children) = fs::read_dir(&path) {
+                for child in children.flatten() {
+                    let child_path = child.path();
+                    if child_path.is_dir() && is_theme_dir(&child_path) {
+                        if let Some(name) = child_path.file_name().and_then(|n| n.to_str()) {
+                            if seen.insert(name.to_string()) {
+                                out.push(GroupedEntry {
+                                    name: name.to_string(),
+                                    group: Some(group_name.to_string()),
+                                    path: child_path.clone(),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    out.sort_by(|a, b| {
+        a.group
+            .is_some()
+            .cmp(&b.group.is_some())
+            .then_with(|| a.group.cmp(&b.group))
+            .then_with(|| a.name.cmp(&b.name))
+    });
+    Ok(out)
+}
+
+fn is_theme_dir(path: &Path) -> bool {
+    path.join("colors.toml").is_file()
 }
 
 fn theme_roots(config: &ResolvedConfig) -> Vec<PathBuf> {
@@ -500,4 +610,55 @@ fn copy_theme_dir(source: &Path, dest: &Path) -> Result<()> {
         fs::copy(entry_path, &target_path)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod grouping_tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn make_theme(dir: &Path) {
+        fs::create_dir_all(dir).unwrap();
+        fs::write(dir.join("colors.toml"), "").unwrap();
+    }
+
+    #[test]
+    fn resolve_named_theme_dir_finds_flat_theme() {
+        let temp = TempDir::new().unwrap();
+        let themes_dir = temp.path().join("themes");
+        make_theme(&themes_dir.join("flat-one"));
+
+        let resolved = resolve_named_theme_dir(&themes_dir, "flat-one");
+        assert_eq!(resolved, themes_dir.join("flat-one"));
+    }
+
+    #[test]
+    fn resolve_named_theme_dir_finds_grouped_theme() {
+        let temp = TempDir::new().unwrap();
+        let themes_dir = temp.path().join("themes");
+        make_theme(&themes_dir.join("my-group").join("nested-one"));
+
+        let resolved = resolve_named_theme_dir(&themes_dir, "nested-one");
+        assert_eq!(resolved, themes_dir.join("my-group").join("nested-one"));
+    }
+
+    #[test]
+    fn resolve_named_theme_dir_falls_back_to_direct_join_when_missing() {
+        let temp = TempDir::new().unwrap();
+        let themes_dir = temp.path().join("themes");
+        fs::create_dir_all(&themes_dir).unwrap();
+
+        let resolved = resolve_named_theme_dir(&themes_dir, "does-not-exist");
+        assert_eq!(resolved, themes_dir.join("does-not-exist"));
+    }
+
+    #[test]
+    fn is_theme_dir_requires_colors_toml() {
+        let temp = TempDir::new().unwrap();
+        let theme_dir = temp.path().join("theme");
+        fs::create_dir_all(&theme_dir).unwrap();
+        assert!(!is_theme_dir(&theme_dir));
+        fs::write(theme_dir.join("colors.toml"), "").unwrap();
+        assert!(is_theme_dir(&theme_dir));
+    }
 }

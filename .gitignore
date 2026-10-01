@@ -1,3 +1,4 @@
 /target
 /rust/target
 /rust/Cargo.lock
+/TRANSCRIPT.md

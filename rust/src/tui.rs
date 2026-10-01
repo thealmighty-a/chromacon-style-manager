@@ -128,6 +128,8 @@ struct PickerState {
     last_query: String,
     filtered_indices: Vec<usize>,
     last_selected: Option<usize>,
+    collapsed_groups: std::collections::HashSet<String>,
+    visual_list_state: ListState,
 }
 
 impl PickerState {
@@ -151,6 +153,8 @@ impl PickerState {
             last_query: String::new(),
             filtered_indices: Vec::new(),
             last_selected: None,
+            collapsed_groups: std::collections::HashSet::new(),
+            visual_list_state: ListState::default(),
         }
     }
 }
@@ -324,33 +328,28 @@ pub fn browse(config: &ResolvedConfig, quiet: bool) -> Result<Option<BrowseSelec
     if quiet {
         // currently unused, but reserved for future use
     }
-    let mut themes = theme_ops::list_theme_entries_for_config(config)?;
-    themes.sort();
-    themes.insert(0, NO_THEME_CHANGE_VALUE.to_string());
-    if themes.is_empty() {
+    let discovered_themes = theme_ops::list_theme_entries_with_groups(config)?;
+    if discovered_themes.is_empty() {
         return Err(anyhow!("no themes available"));
     }
 
-    let theme_items: Vec<OptionItem> = themes
-        .into_iter()
-        .map(|name| {
-            if name == NO_THEME_CHANGE_VALUE {
-                return Ok(OptionItem {
-                    label: NO_THEME_CHANGE_LABEL.to_string(),
-                    value: name,
-                    preview: None,
-                });
-            }
-            let label = title_case_theme(&name);
-            let theme_path = theme_ops::resolve_theme_path(config, &name)?;
-            let preview_path = preview::find_theme_preview(&theme_path);
-            Ok(OptionItem {
-                label,
-                value: name,
-                preview: preview_path,
-            })
-        })
-        .collect::<Result<Vec<_>>>()?;
+    let theme_items: Vec<OptionItem> = std::iter::once(OptionItem {
+        label: NO_THEME_CHANGE_LABEL.to_string(),
+        value: NO_THEME_CHANGE_VALUE.to_string(),
+        preview: None,
+        group: None,
+    })
+    .chain(discovered_themes.into_iter().map(|entry| {
+        let label = title_case_theme(&entry.name);
+        let preview_path = preview::find_theme_preview(&entry.path);
+        OptionItem {
+            label,
+            value: entry.name,
+            preview: preview_path,
+            group: entry.group,
+        }
+    }))
+    .collect();
 
     let backend = PreviewBackend::detect();
     let mut terminal = setup_terminal()?;
@@ -628,6 +627,12 @@ pub fn browse(config: &ResolvedConfig, quiet: bool) -> Result<Option<BrowseSelec
                 }
             }
 
+            let grouped_tab = match tab {
+                BrowseTab::Theme => grouping_active(&theme_items, &theme_state.search_query),
+                BrowseTab::Waybar => grouping_active(&waybar_items, &waybar_state.search_query),
+                BrowseTab::Walker => grouping_active(&walker_items, &walker_state.search_query),
+                _ => false,
+            };
             render_status_bar(
                 frame,
                 status_area,
@@ -641,6 +646,7 @@ pub fn browse(config: &ResolvedConfig, quiet: bool) -> Result<Option<BrowseSelec
                 status_active.then_some(status_message.as_str()),
                 preset_save_active,
                 &preset_save_input,
+                grouped_tab,
             );
         })?;
 
@@ -1062,6 +1068,31 @@ pub fn browse(config: &ResolvedConfig, quiet: bool) -> Result<Option<BrowseSelec
                             continue 'event_loop;
                         }
 
+                        if matches!(key.code, KeyCode::Left | KeyCode::Right) {
+                            let collapse = key.code == KeyCode::Left;
+                            let handled = match tab {
+                                BrowseTab::Theme if theme_state.focus == FocusArea::List => {
+                                    toggle_group_collapse(&mut theme_state, &theme_items, collapse);
+                                    true
+                                }
+                                BrowseTab::Waybar if waybar_state.focus == FocusArea::List => {
+                                    toggle_group_collapse(&mut waybar_state, &waybar_items, collapse);
+                                    true
+                                }
+                                BrowseTab::Walker if walker_state.focus == FocusArea::List => {
+                                    toggle_group_collapse(&mut walker_state, &walker_items, collapse);
+                                    true
+                                }
+                                _ => false,
+                            };
+                            if handled {
+                                if !event::poll(Duration::from_millis(0))? {
+                                    break 'event_loop;
+                                }
+                                continue 'event_loop;
+                            }
+                        }
+
                         let items_len = match tab {
                             BrowseTab::Theme => theme_state.filtered_indices.len(),
                             BrowseTab::Waybar => waybar_state.filtered_indices.len(),
@@ -1171,43 +1202,68 @@ pub fn browse(config: &ResolvedConfig, quiet: bool) -> Result<Option<BrowseSelec
                                 }
                             }
 
-                            let items_len = match tab {
-                                BrowseTab::Theme => theme_state.filtered_indices.len(),
-                                BrowseTab::Waybar => waybar_state.filtered_indices.len(),
-                                BrowseTab::Walker => walker_state.filtered_indices.len(),
-                                BrowseTab::Hyprlock => hyprlock_state.filtered_indices.len(),
-                                BrowseTab::Unlock => unlock_state.filtered_indices.len(),
-                                BrowseTab::Starship => starship_state.filtered_indices.len(),
-                                BrowseTab::Presets => preset_state.filtered_indices.len(),
-                                BrowseTab::Review => 0,
+                            let position = Position {
+                                x: mouse.column,
+                                y: mouse.row,
                             };
-                            if let Some(state) = active_picker_mut(
-                                tab,
-                                &mut theme_state,
-                                &mut waybar_state,
-                                &mut walker_state,
-                                &mut hyprlock_state,
-                                &mut unlock_state,
-                                &mut starship_state,
-                                &mut preset_state,
-                            ) {
-                                let position = Position {
-                                    x: mouse.column,
-                                    y: mouse.row,
-                                };
-                                if active_search_area.contains(position) {
-                                    state.focus = FocusArea::List;
-                                } else if active_list_inner.contains(position) {
-                                    state.focus = FocusArea::List;
-                                    select_index_at_row(
-                                        &mut state.list_state,
-                                        active_list_inner,
-                                        mouse.row,
-                                        items_len,
-                                    );
-                                } else if active_code_inner.contains(position) {
-                                    state.focus = FocusArea::Code;
-                                }
+                            match tab {
+                                BrowseTab::Theme => handle_list_mouse_click(
+                                    &mut theme_state,
+                                    &theme_items,
+                                    position,
+                                    active_search_area,
+                                    active_list_inner,
+                                    active_code_inner,
+                                ),
+                                BrowseTab::Waybar => handle_list_mouse_click(
+                                    &mut waybar_state,
+                                    &waybar_items,
+                                    position,
+                                    active_search_area,
+                                    active_list_inner,
+                                    active_code_inner,
+                                ),
+                                BrowseTab::Walker => handle_list_mouse_click(
+                                    &mut walker_state,
+                                    &walker_items,
+                                    position,
+                                    active_search_area,
+                                    active_list_inner,
+                                    active_code_inner,
+                                ),
+                                BrowseTab::Hyprlock => handle_list_mouse_click(
+                                    &mut hyprlock_state,
+                                    &hyprlock_items,
+                                    position,
+                                    active_search_area,
+                                    active_list_inner,
+                                    active_code_inner,
+                                ),
+                                BrowseTab::Unlock => handle_list_mouse_click(
+                                    &mut unlock_state,
+                                    &unlock_items,
+                                    position,
+                                    active_search_area,
+                                    active_list_inner,
+                                    active_code_inner,
+                                ),
+                                BrowseTab::Starship => handle_list_mouse_click(
+                                    &mut starship_state,
+                                    &starship_items,
+                                    position,
+                                    active_search_area,
+                                    active_list_inner,
+                                    active_code_inner,
+                                ),
+                                BrowseTab::Presets => handle_list_mouse_click(
+                                    &mut preset_state,
+                                    &preset_items,
+                                    position,
+                                    active_search_area,
+                                    active_list_inner,
+                                    active_code_inner,
+                                ),
+                                BrowseTab::Review => {}
                             }
                         }
                         MouseEventKind::ScrollUp => {
@@ -1359,6 +1415,7 @@ struct OptionItem {
     label: String,
     value: String,
     preview: Option<PathBuf>,
+    group: Option<String>,
 }
 
 impl OptionItem {
@@ -1368,11 +1425,22 @@ impl OptionItem {
         kind: &str,
         preview: Option<PathBuf>,
     ) -> LabeledItem {
+        Self::with_kind_and_group(label, value, kind, preview, None)
+    }
+
+    fn with_kind_and_group(
+        label: String,
+        value: String,
+        kind: &str,
+        preview: Option<PathBuf>,
+        group: Option<String>,
+    ) -> LabeledItem {
         LabeledItem {
             label,
             value,
             kind: kind.to_string(),
             preview,
+            group,
         }
     }
 }
@@ -1383,11 +1451,93 @@ struct LabeledItem {
     value: String,
     kind: String,
     preview: Option<PathBuf>,
+    group: Option<String>,
 }
 
 struct PresetItem {
     label: String,
     name: String,
+}
+
+/// A theme/config entry discovered under a themes directory, optionally
+/// nested one level inside an organizational group folder.
+struct DiscoveredTheme {
+    name: String,
+    group: Option<String>,
+    path: PathBuf,
+}
+
+/// Discover entries directly under `themes_dir`, plus one level of nested
+/// entries inside folders that aren't themselves a valid theme (treated as
+/// an organizational group). `is_theme_dir` decides what counts as a theme;
+/// `skip_name` filters out internal/auto-generated entries at either level.
+fn discover_grouped_themes(
+    themes_dir: &Path,
+    is_theme_dir: impl Fn(&Path) -> bool,
+    skip_name: impl Fn(&str) -> bool,
+) -> Result<Vec<DiscoveredTheme>> {
+    if !themes_dir.is_dir() {
+        return Ok(Vec::new());
+    }
+    let mut out = Vec::new();
+    for entry in fs::read_dir(themes_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if skip_name(name) {
+            continue;
+        }
+        if is_theme_dir(&path) {
+            out.push(DiscoveredTheme {
+                name: name.to_string(),
+                group: None,
+                path: path.clone(),
+            });
+            continue;
+        }
+        let group_name = name.to_string();
+        if let Ok(children) = fs::read_dir(&path) {
+            for child in children.flatten() {
+                let child_path = child.path();
+                if !child_path.is_dir() {
+                    continue;
+                }
+                let Some(child_name) = child_path.file_name().and_then(|n| n.to_str()) else {
+                    continue;
+                };
+                if skip_name(child_name) || !is_theme_dir(&child_path) {
+                    continue;
+                }
+                out.push(DiscoveredTheme {
+                    name: child_name.to_string(),
+                    group: Some(group_name.clone()),
+                    path: child_path.clone(),
+                });
+            }
+        }
+    }
+    out.sort_by(|a, b| {
+        a.group
+            .is_some()
+            .cmp(&b.group.is_some())
+            .then_with(|| a.group.cmp(&b.group))
+            .then_with(|| a.name.cmp(&b.name))
+    });
+    Ok(out)
+}
+
+fn pin_omarchy_default_first_entries(entries: &mut Vec<DiscoveredTheme>) {
+    if let Some(index) = entries.iter().position(|e| e.name == "omarchy-default") {
+        if index != 0 {
+            let value = entries.remove(index);
+            entries.insert(0, value);
+        }
+    }
 }
 
 fn build_waybar_items(config: &ResolvedConfig, theme_path: &Path) -> Result<Vec<LabeledItem>> {
@@ -1412,15 +1562,16 @@ fn build_waybar_items(config: &ResolvedConfig, theme_path: &Path) -> Result<Vec<
         ));
     }
 
-    let mut names = list_waybar_themes(&config.waybar_themes_dir)?;
-    pin_omarchy_default_first(&mut names);
-    for name in names {
-        let preview_path = preview::find_waybar_preview(&config.waybar_themes_dir.join(&name));
-        items.push(OptionItem::with_kind(
-            display_theme_name(&name),
-            name,
+    let mut entries = list_waybar_themes(&config.waybar_themes_dir)?;
+    pin_omarchy_default_first_entries(&mut entries);
+    for entry in entries {
+        let preview_path = preview::find_waybar_preview(&entry.path);
+        items.push(OptionItem::with_kind_and_group(
+            display_theme_name(&entry.name),
+            entry.name,
             "named",
             preview_path,
+            entry.group,
         ));
     }
 
@@ -1504,16 +1655,16 @@ fn build_walker_items(config: &ResolvedConfig, theme_path: &Path) -> Result<Vec<
         ));
     }
 
-    let mut names = list_walker_themes(&config.walker_themes_dir)?;
-    pin_omarchy_default_first(&mut names);
-    for name in names {
-        let preview_path =
-            crate::preview::find_walker_preview(&config.walker_themes_dir.join(&name));
-        items.push(OptionItem::with_kind(
-            display_theme_name(&name),
-            name,
+    let mut entries = list_walker_themes(&config.walker_themes_dir)?;
+    pin_omarchy_default_first_entries(&mut entries);
+    for entry in entries {
+        let preview_path = crate::preview::find_walker_preview(&entry.path);
+        items.push(OptionItem::with_kind_and_group(
+            display_theme_name(&entry.name),
+            entry.name,
             "named",
             preview_path,
+            entry.group,
         ));
     }
 
@@ -2016,6 +2167,55 @@ fn preview_debug_enabled() -> bool {
     std::env::var("THEME_MANAGER_DEBUG_PREVIEW").is_ok()
 }
 
+enum DisplayRow {
+    Header { name: String, count: usize },
+    Item(usize),
+}
+
+/// Only group tabs that actually have at least one grouped item, and only
+/// while there's no active search (search already reorders by relevance, so
+/// group headers would be meaningless; search also bypasses collapsed state
+/// so results are never hidden).
+fn grouping_active<T: ItemView>(items: &[T], search_query: &str) -> bool {
+    search_query.trim().is_empty() && items.iter().any(|item| item.group().is_some())
+}
+
+/// Flattens `items` (already sorted so same-group entries are contiguous)
+/// into header + item rows, skipping item rows for collapsed groups while
+/// still showing their header (with a disclosure glyph and count) so they
+/// can be re-expanded.
+fn build_display_rows<T: ItemView>(items: &[T], filtered_indices: &[usize]) -> Vec<DisplayRow> {
+    let visible: std::collections::HashSet<usize> = filtered_indices.iter().copied().collect();
+    let mut rows = Vec::new();
+    let mut current_group: Option<String> = None;
+    let mut started = false;
+    let mut i = 0;
+    while i < items.len() {
+        let group = items[i].group().map(|g| g.to_string());
+        if !started || current_group != group {
+            if let Some(name) = &group {
+                let mut count = 0;
+                let mut j = i;
+                while j < items.len() && items[j].group() == Some(name.as_str()) {
+                    count += 1;
+                    j += 1;
+                }
+                rows.push(DisplayRow::Header {
+                    name: name.clone(),
+                    count,
+                });
+            }
+            current_group = group;
+            started = true;
+        }
+        if visible.contains(&i) {
+            rows.push(DisplayRow::Item(i));
+        }
+        i += 1;
+    }
+    rows
+}
+
 fn render_picker<T: ItemView>(
     frame: &mut Frame,
     area: Rect,
@@ -2068,11 +2268,6 @@ fn render_picker<T: ItemView>(
         state.focus == FocusArea::List,
     );
 
-    let list_items: Vec<ListItem> = state
-        .filtered_indices
-        .iter()
-        .map(|&idx| ListItem::new(Line::from(items[idx].label())))
-        .collect();
     let list_title = build_list_title(title, status);
     let list_block = Block::default()
         .title(list_title)
@@ -2086,15 +2281,61 @@ fn render_picker<T: ItemView>(
         } else {
             Style::default()
         });
-    let list = List::new(list_items)
-        .block(list_block)
-        .highlight_style(
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        )
-        .highlight_symbol(">> ");
-    frame.render_stateful_widget(list, list_area, &mut state.list_state);
+    if grouping_active(items, &state.search_query) {
+        let rows = build_display_rows(items, &state.filtered_indices);
+        let selected_real_idx = selected_item_index(state, items.len());
+        let mut visual_selected = None;
+        let list_items: Vec<ListItem> = rows
+            .iter()
+            .enumerate()
+            .map(|(visual_idx, row)| match row {
+                DisplayRow::Header { name, count } => {
+                    let glyph = if state.collapsed_groups.contains(name) {
+                        "\u{25b8}"
+                    } else {
+                        "\u{25be}"
+                    };
+                    ListItem::new(Line::from(Span::styled(
+                        format!("{glyph} {name} ({count})"),
+                        Style::default()
+                            .fg(Color::DarkGray)
+                            .add_modifier(Modifier::BOLD),
+                    )))
+                }
+                DisplayRow::Item(idx) => {
+                    if Some(*idx) == selected_real_idx {
+                        visual_selected = Some(visual_idx);
+                    }
+                    ListItem::new(Line::from(items[*idx].label()))
+                }
+            })
+            .collect();
+        state.visual_list_state.select(visual_selected);
+        let list = List::new(list_items)
+            .block(list_block)
+            .highlight_style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol(">> ");
+        frame.render_stateful_widget(list, list_area, &mut state.visual_list_state);
+    } else {
+        let list_items: Vec<ListItem> = state
+            .filtered_indices
+            .iter()
+            .map(|&idx| ListItem::new(Line::from(items[idx].label())))
+            .collect();
+        let list = List::new(list_items)
+            .block(list_block)
+            .highlight_style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol(">> ");
+        frame.render_stateful_widget(list, list_area, &mut state.list_state);
+    }
 
     let selected = selected_index(&state.list_state, state.filtered_indices.len());
     let selected_item = state.filtered_indices.get(selected).copied();
@@ -2369,6 +2610,7 @@ fn render_status_bar(
     status: Option<&str>,
     save_active: bool,
     save_input: &str,
+    grouped_tab: bool,
 ) {
     let mut spans = Vec::new();
     let mut segments: Vec<(String, Color, Color)> = Vec::new();
@@ -2402,6 +2644,14 @@ fn render_status_bar(
         Color::Black,
         Color::Magenta,
     ));
+
+    if grouped_tab && !save_active {
+        segments.push((
+            "\u{2190}/\u{2192} Collapse/Expand Group".to_string(),
+            Color::Black,
+            Color::LightMagenta,
+        ));
+    }
 
     if tab == BrowseTab::Review && !save_active {
         segments.push((
@@ -3134,9 +3384,19 @@ fn reset_picker_cache(state: &mut PickerState) {
     state.force_clear = true;
 }
 
-fn filter_item_indices<T: ItemView>(items: &[T], query: &str) -> Vec<usize> {
+fn filter_item_indices<T: ItemView>(
+    items: &[T],
+    query: &str,
+    collapsed: &std::collections::HashSet<String>,
+) -> Vec<usize> {
     if query.trim().is_empty() {
-        return (0..items.len()).collect();
+        return (0..items.len())
+            .filter(|&idx| {
+                items[idx]
+                    .group()
+                    .map_or(true, |g| !collapsed.contains(g))
+            })
+            .collect();
     }
     let mut scored: Vec<(i64, usize, String)> = Vec::new();
     for (idx, item) in items.iter().enumerate() {
@@ -3233,7 +3493,8 @@ fn selected_item_index(state: &PickerState, len: usize) -> Option<usize> {
 
 fn rebuild_filtered<T: ItemView>(state: &mut PickerState, items: &[T]) {
     let previous = selected_item_index(state, items.len());
-    state.filtered_indices = filter_item_indices(items, &state.search_query);
+    state.filtered_indices =
+        filter_item_indices(items, &state.search_query, &state.collapsed_groups);
     let query_changed = state.search_query != state.last_query;
     state.last_query = state.search_query.clone();
     if query_changed && !state.search_query.trim().is_empty() {
@@ -3266,6 +3527,24 @@ fn rebuild_filtered<T: ItemView>(state: &mut PickerState, items: &[T]) {
     {
         state.last_selected = Some(selected);
     }
+}
+
+/// Collapse (or expand) the group the currently selected item belongs to.
+/// A no-op if the current item isn't in a group.
+fn toggle_group_collapse<T: ItemView>(state: &mut PickerState, items: &[T], collapse: bool) {
+    let Some(idx) = selected_item_index(state, items.len()) else {
+        return;
+    };
+    let Some(group) = items[idx].group() else {
+        return;
+    };
+    let group = group.to_string();
+    if collapse {
+        state.collapsed_groups.insert(group);
+    } else {
+        state.collapsed_groups.remove(&group);
+    }
+    rebuild_filtered(state, items);
 }
 
 fn ensure_selected(state: &mut ListState, len: usize) {
@@ -3345,6 +3624,60 @@ fn select_index_at_row(state: &mut ListState, rect: Rect, row: u16, len: usize) 
     }
 }
 
+/// Handles a left click within a tab's picker: focuses the clicked pane, and
+/// for the list pane, maps the clicked screen row to either a real item
+/// (selects it) or, when groups are present, a header row (toggles that
+/// group's collapsed state).
+fn handle_list_mouse_click<T: ItemView>(
+    state: &mut PickerState,
+    items: &[T],
+    position: Position,
+    search_area: Rect,
+    list_inner: Rect,
+    code_inner: Rect,
+) {
+    if search_area.contains(position) {
+        state.focus = FocusArea::List;
+    } else if list_inner.contains(position) {
+        state.focus = FocusArea::List;
+        if grouping_active(items, &state.search_query) {
+            let rows = build_display_rows(items, &state.filtered_indices);
+            if list_inner.height == 0 {
+                return;
+            }
+            let offset = state.visual_list_state.offset();
+            let relative = position.y.saturating_sub(list_inner.y) as usize;
+            let clicked = offset.saturating_add(relative);
+            match rows.get(clicked) {
+                Some(DisplayRow::Header { name, .. }) => {
+                    let name = name.clone();
+                    if state.collapsed_groups.contains(&name) {
+                        state.collapsed_groups.remove(&name);
+                    } else {
+                        state.collapsed_groups.insert(name);
+                    }
+                    rebuild_filtered(state, items);
+                }
+                Some(DisplayRow::Item(idx)) => {
+                    if let Some(pos) = state.filtered_indices.iter().position(|&i| i == *idx) {
+                        state.list_state.select(Some(pos));
+                    }
+                }
+                None => {}
+            }
+        } else {
+            select_index_at_row(
+                &mut state.list_state,
+                list_inner,
+                position.y,
+                state.filtered_indices.len(),
+            );
+        }
+    } else if code_inner.contains(position) {
+        state.focus = FocusArea::Code;
+    }
+}
+
 fn next_index(current: Option<usize>, len: usize) -> usize {
     if len == 0 {
         return 0;
@@ -3371,45 +3704,22 @@ fn previous_index(current: Option<usize>, len: usize) -> usize {
     }
 }
 
-fn list_waybar_themes(waybar_themes_dir: &Path) -> Result<Vec<String>> {
-    if !waybar_themes_dir.is_dir() {
-        return Ok(Vec::new());
-    }
-    let mut entries = Vec::new();
-    for entry in fs::read_dir(waybar_themes_dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_dir() && path.join("config.jsonc").is_file() && path.join("style.css").is_file()
-        {
-            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                entries.push(name.to_string());
-            }
-        }
-    }
-    entries.sort();
-    Ok(entries)
+fn list_waybar_themes(waybar_themes_dir: &Path) -> Result<Vec<DiscoveredTheme>> {
+    discover_grouped_themes(
+        waybar_themes_dir,
+        |path| path.join("config.jsonc").is_file() && path.join("style.css").is_file(),
+        |_name| false,
+    )
 }
 
-fn list_walker_themes(walker_themes_dir: &Path) -> Result<Vec<String>> {
-    if !walker_themes_dir.is_dir() {
-        return Ok(Vec::new());
-    }
-    let mut entries = Vec::new();
-    for entry in fs::read_dir(walker_themes_dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        // Walker themes require style.css, layout.xml is optional
-        if path.is_dir() && path.join("style.css").is_file() {
-            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                // Skip the auto-generated theme
-                if name != "cc-auto" {
-                    entries.push(name.to_string());
-                }
-            }
-        }
-    }
-    entries.sort();
-    Ok(entries)
+fn list_walker_themes(walker_themes_dir: &Path) -> Result<Vec<DiscoveredTheme>> {
+    // Walker themes require style.css, layout.xml is optional. "cc-auto" is
+    // the auto-generated theme and is never a pickable entry.
+    discover_grouped_themes(
+        walker_themes_dir,
+        |path| path.join("style.css").is_file(),
+        |name| name == "cc-auto",
+    )
 }
 
 fn list_hyprlock_themes(hyprlock_themes_dir: &Path) -> Result<Vec<String>> {
@@ -3672,17 +3982,26 @@ fn term_program_contains(value: &str) -> bool {
 
 trait ItemView {
     fn label(&self) -> String;
+    fn group(&self) -> Option<&str> {
+        None
+    }
 }
 
 impl ItemView for OptionItem {
     fn label(&self) -> String {
         self.label.clone()
     }
+    fn group(&self) -> Option<&str> {
+        self.group.as_deref()
+    }
 }
 
 impl ItemView for LabeledItem {
     fn label(&self) -> String {
         self.label.clone()
+    }
+    fn group(&self) -> Option<&str> {
+        self.group.as_deref()
     }
 }
 
@@ -3719,7 +4038,7 @@ mod tests {
                 label: "charlie".to_string(),
             },
         ];
-        let filtered = filter_item_indices(&items, "");
+        let filtered = filter_item_indices(&items, "", &std::collections::HashSet::new());
         assert_eq!(filtered, vec![0, 1, 2]);
     }
 
@@ -3736,7 +4055,7 @@ mod tests {
                 label: "charlie".to_string(),
             },
         ];
-        let filtered = filter_item_indices(&items, "br");
+        let filtered = filter_item_indices(&items, "br", &std::collections::HashSet::new());
         assert_eq!(filtered, vec![1]);
     }
 
@@ -3772,7 +4091,7 @@ mod tests {
                 label: "nord".to_string(),
             },
         ];
-        let filtered = filter_item_indices(&items, "dra");
+        let filtered = filter_item_indices(&items, "dra", &std::collections::HashSet::new());
         assert_eq!(filtered, vec![0]);
     }
 
@@ -3786,7 +4105,7 @@ mod tests {
                 label: "nord".to_string(),
             },
         ];
-        let filtered = filter_item_indices(&items, "drc");
+        let filtered = filter_item_indices(&items, "drc", &std::collections::HashSet::new());
         assert_eq!(filtered, vec![0]);
     }
 
@@ -3950,5 +4269,170 @@ mod tests {
             detect_preview_backend_kind(false, false, false, true),
             PreviewBackendKind::None
         );
+    }
+
+    struct GroupedDummyItem {
+        label: String,
+        group: Option<String>,
+    }
+
+    impl ItemView for GroupedDummyItem {
+        fn label(&self) -> String {
+            self.label.clone()
+        }
+        fn group(&self) -> Option<&str> {
+            self.group.as_deref()
+        }
+    }
+
+    fn grouped_fixture() -> Vec<GroupedDummyItem> {
+        // Pre-sorted the way build_waybar_items/build_walker_items sort
+        // discovered entries: ungrouped first, then grouped alphabetically.
+        vec![
+            GroupedDummyItem {
+                label: "none".to_string(),
+                group: None,
+            },
+            GroupedDummyItem {
+                label: "atif-pill".to_string(),
+                group: Some("atif".to_string()),
+            },
+            GroupedDummyItem {
+                label: "atif-dock".to_string(),
+                group: Some("atif".to_string()),
+            },
+            GroupedDummyItem {
+                label: "cc-squared".to_string(),
+                group: Some("cc".to_string()),
+            },
+        ]
+    }
+
+    #[test]
+    fn filter_item_indices_excludes_collapsed_group_when_query_empty() {
+        let items = grouped_fixture();
+        let mut collapsed = std::collections::HashSet::new();
+        collapsed.insert("atif".to_string());
+        let filtered = filter_item_indices(&items, "", &collapsed);
+        // Ungrouped item (0) and the "cc" group's item (3) remain; "atif" (1, 2) is hidden.
+        assert_eq!(filtered, vec![0, 3]);
+    }
+
+    #[test]
+    fn filter_item_indices_ignores_collapsed_groups_while_searching() {
+        let items = grouped_fixture();
+        let mut collapsed = std::collections::HashSet::new();
+        collapsed.insert("atif".to_string());
+        let filtered = filter_item_indices(&items, "atif", &collapsed);
+        // Search bypasses collapse entirely: both atif items should be found.
+        assert!(filtered.contains(&1));
+        assert!(filtered.contains(&2));
+    }
+
+    #[test]
+    fn build_display_rows_inserts_header_per_group_and_skips_collapsed_items() {
+        let items = grouped_fixture();
+        let collapsed = {
+            let mut set = std::collections::HashSet::new();
+            set.insert("atif".to_string());
+            set
+        };
+        let filtered = filter_item_indices(&items, "", &collapsed);
+        let rows = build_display_rows(&items, &filtered);
+
+        // Expected shape: ungrouped item 0, "atif" header (still shown even
+        // though collapsed, with no item rows under it), "cc" header, item 3.
+        assert_eq!(rows.len(), 4);
+        assert!(matches!(&rows[0], DisplayRow::Item(0)));
+        assert!(matches!(&rows[1], DisplayRow::Header { name, count } if name == "atif" && *count == 2));
+        assert!(matches!(&rows[2], DisplayRow::Header { name, .. } if name == "cc"));
+        assert!(matches!(&rows[3], DisplayRow::Item(3)));
+    }
+
+    #[test]
+    fn build_display_rows_shows_items_for_expanded_groups() {
+        let items = grouped_fixture();
+        let collapsed = std::collections::HashSet::new();
+        let filtered = filter_item_indices(&items, "", &collapsed);
+        let rows = build_display_rows(&items, &filtered);
+
+        // Ungrouped item, "atif" header + its 2 items, "cc" header + its item.
+        assert_eq!(rows.len(), 6);
+        assert!(matches!(&rows[0], DisplayRow::Item(0)));
+        assert!(matches!(&rows[1], DisplayRow::Header { name, .. } if name == "atif"));
+        assert!(matches!(&rows[2], DisplayRow::Item(1)));
+        assert!(matches!(&rows[3], DisplayRow::Item(2)));
+        assert!(matches!(&rows[4], DisplayRow::Header { name, .. } if name == "cc"));
+        assert!(matches!(&rows[5], DisplayRow::Item(3)));
+    }
+
+    #[test]
+    fn grouping_active_is_false_without_groups_or_during_search() {
+        let flat_items = vec![
+            DummyItem {
+                label: "a".to_string(),
+            },
+            DummyItem {
+                label: "b".to_string(),
+            },
+        ];
+        assert!(!grouping_active(&flat_items, ""));
+
+        let grouped_items = grouped_fixture();
+        assert!(grouping_active(&grouped_items, ""));
+        assert!(!grouping_active(&grouped_items, "atif"));
+    }
+
+    #[test]
+    fn discover_grouped_themes_treats_subfolder_as_group() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let root = temp.path();
+
+        // Flat theme directly under root.
+        let flat = root.join("flat-theme");
+        std::fs::create_dir_all(&flat).unwrap();
+        std::fs::write(flat.join("style.css"), "").unwrap();
+
+        // Group folder containing two valid themes and one invalid entry.
+        let group = root.join("my-group");
+        std::fs::create_dir_all(group.join("nested-a")).unwrap();
+        std::fs::write(group.join("nested-a").join("style.css"), "").unwrap();
+        std::fs::create_dir_all(group.join("nested-b")).unwrap();
+        std::fs::write(group.join("nested-b").join("style.css"), "").unwrap();
+        std::fs::create_dir_all(group.join("not-a-theme")).unwrap();
+
+        // Empty folder that doesn't qualify as a group (no valid children).
+        std::fs::create_dir_all(root.join("empty-folder")).unwrap();
+
+        let is_theme_dir = |p: &Path| p.join("style.css").is_file();
+        let entries = discover_grouped_themes(root, is_theme_dir, |_| false).unwrap();
+
+        let flat_entry = entries.iter().find(|e| e.name == "flat-theme").unwrap();
+        assert_eq!(flat_entry.group, None);
+
+        let nested_a = entries.iter().find(|e| e.name == "nested-a").unwrap();
+        assert_eq!(nested_a.group.as_deref(), Some("my-group"));
+        let nested_b = entries.iter().find(|e| e.name == "nested-b").unwrap();
+        assert_eq!(nested_b.group.as_deref(), Some("my-group"));
+
+        assert!(!entries.iter().any(|e| e.name == "not-a-theme"));
+        assert!(!entries.iter().any(|e| e.name == "empty-folder"));
+        assert_eq!(entries.len(), 3);
+    }
+
+    #[test]
+    fn discover_grouped_themes_respects_skip_name() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let root = temp.path();
+        std::fs::create_dir_all(root.join("cc-auto")).unwrap();
+        std::fs::write(root.join("cc-auto").join("style.css"), "").unwrap();
+        std::fs::create_dir_all(root.join("real-theme")).unwrap();
+        std::fs::write(root.join("real-theme").join("style.css"), "").unwrap();
+
+        let is_theme_dir = |p: &Path| p.join("style.css").is_file();
+        let entries = discover_grouped_themes(root, is_theme_dir, |name| name == "cc-auto").unwrap();
+
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "real-theme");
     }
 }

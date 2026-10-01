@@ -7,7 +7,7 @@ use crate::omarchy;
 use crate::omarchy_defaults;
 use crate::omarchy_defaults::SymlinkEnsureResult;
 use crate::paths::current_theme_name;
-use crate::theme_ops::{CommandContext, HyprlockMode};
+use crate::theme_ops::{self, CommandContext, HyprlockMode};
 
 const OMARCHY_DEFAULT_THEME_NAME: &str = "omarchy-default";
 const CURRENT_THEME_SOURCE_SUFFIX: &str = "/.local/state/cc/theme/hyprlock.conf";
@@ -31,7 +31,7 @@ pub fn prepare_hyprlock(ctx: &CommandContext<'_>, theme_dir: &Path) -> Result<()
         HyprlockMode::None => return Ok(()),
         HyprlockMode::Auto => theme_dir.join("hyprlock-theme"),
         HyprlockMode::Named => match &ctx.hyprlock_name {
-            Some(name) => ctx.config.hyprlock_themes_dir.join(name),
+            Some(name) => theme_ops::resolve_named_theme_dir(&ctx.config.hyprlock_themes_dir, name),
             None => return Ok(()),
         },
     };

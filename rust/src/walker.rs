@@ -5,7 +5,7 @@ use std::path::Path;
 use crate::config::ResolvedConfig;
 use crate::omarchy_defaults;
 use crate::omarchy_defaults::SymlinkEnsureResult;
-use crate::theme_ops::{CommandContext, WalkerMode};
+use crate::theme_ops::{self, CommandContext, WalkerMode};
 
 const AUTO_THEME_NAME: &str = "cc-auto";
 const OMARCHY_DEFAULT_THEME_NAME: &str = "omarchy-default";
@@ -21,7 +21,7 @@ pub fn prepare_walker(ctx: &CommandContext<'_>, theme_dir: &Path) -> Result<()> 
         }
         WalkerMode::Named => match &ctx.walker_name {
             Some(name) => {
-                let dir = ctx.config.walker_themes_dir.join(name);
+                let dir = theme_ops::resolve_named_theme_dir(&ctx.config.walker_themes_dir, name);
                 (dir, Some(name.clone()))
             }
             None => return Ok(()),

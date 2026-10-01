@@ -1,11 +1,18 @@
-# Theme Manager Plus
+# ChromaCon Style Manager
 
 ## Overview
 
-**Theme Manager Plus** is a TUI and CLI tool that switches Omarchy themes *exactly the same way the Omarchy menu does*, with additional flexibility and automation.
+**ChromaCon Style Manager** is a TUI and CLI tool for switching themes (plus Waybar, Walker, Hyprlock, and Starship) on **ChromaCon**, a personal Hyprland desktop setup. It's a fork of [theme-manager-plus](https://github.com/OldJobobo/theme-manager-plus) by OldJobobo, adapted to drive ChromaCon's own `cc-*` helper scripts and `~/.config/cc/...` theme layout instead of Omarchy's. Most of the original design (the TUI, the apply pipeline, preset bundles) comes from that project — full credit to OldJobobo for it.
 
-It is **not a replacement** for Omarchy’s theming system.  
-Think of it as a **direct, expanded interface** for driving Omarchy’s existing theme flow—script-compatible, hook-compatible, and future-proof.
+It is **not a replacement** for ChromaCon's own theming scripts (`cc-theme-set`, `cc-hook`, etc.).  
+Think of it as a **direct, expanded interface** for driving that existing theme flow — script-compatible, hook-compatible.
+
+### What's different from upstream
+
+- Talks to ChromaCon's `cc-*` helpers and `~/.config/cc/themes` instead of requiring Omarchy to be installed
+- Binary/command is `chromacon-style-manager`, not `chromacon-style-manager`
+- Theme, Waybar, and Walker tabs support one level of folder-based grouping (put related themes in a subfolder and collapse/expand it in the TUI with Left/Right)
+- The rest of this README is largely inherited from upstream and still describes the general Omarchy-shaped flow; treat command names and some paths below as illustrative rather than exact for a ChromaCon install
 
 ### What it does
 
@@ -23,16 +30,15 @@ Think of it as a **direct, expanded interface** for driving Omarchy’s existing
 
 ## Quick Start
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/OldJobobo/theme-manager-plus/master/install.sh | bash
-theme-manager
-```
-
-If the command is not found, open a new terminal or run:
+Build from source and install the binary to `~/.local/bin`:
 
 ```sh
-source ~/.profile
+cargo build --release --manifest-path rust/Cargo.toml
+cp rust/target/release/chromacon-style-manager ~/.local/bin/
+chromacon-style-manager
 ```
+
+(This fork doesn't use upstream's `install.sh`/`uninstall.sh` curl installers — those point at OldJobobo's original repo and would install the unmodified upstream tool, not this one.)
 
 ---
 
@@ -51,45 +57,26 @@ source ~/.profile
 
 ## Installation
 
-**Install latest (Linux x86_64):**
-```sh
-curl -fsSL https://raw.githubusercontent.com/OldJobobo/theme-manager-plus/master/install.sh | bash
-```
-
-**Install a specific version:**
-```sh
-THEME_MANAGER_VERSION=0.2.6 \
-  curl -fsSL https://raw.githubusercontent.com/OldJobobo/theme-manager-plus/master/install.sh | bash
-```
-
-**Uninstall:**
-```sh
-curl -fsSL https://raw.githubusercontent.com/OldJobobo/theme-manager-plus/master/uninstall.sh | bash
-```
-
-**Uninstall and remove config:**
-```sh
-curl -fsSL https://raw.githubusercontent.com/OldJobobo/theme-manager-plus/master/uninstall.sh | bash -s -- --purge
-```
+See Quick Start above — build from source with `cargo build --release` and copy the binary into place. There's no curl-pipe installer for this fork.
 
 ---
 
 ## Common Commands
 
-- `theme-manager` — open the full-screen browser (default)
-- `theme-manager list` — list available themes
-- `theme-manager set <Theme>` — switch to a theme
-- `theme-manager set <Theme> -w` — switch theme and apply Waybar
-- `theme-manager set <Theme> -k` — switch theme and apply bundled Walker theme
-- `theme-manager set <Theme> --hyprlock` — switch theme and apply bundled Hyprlock theme
-- `theme-manager browse` — interactive selector (theme + Waybar + Walker + Hyprlock + Unlock + Starship)
-- `theme-manager waybar <mode>` — apply Waybar only
-- `theme-manager walker <mode>` — apply Walker only
-- `theme-manager hyprlock <mode>` — apply Hyprlock only
-- `theme-manager unlock list|set|reset` — list or apply Omarchy 3.7 boot unlock themes
-- `theme-manager starship <mode>` — apply Starship only
-- `theme-manager preset save|load|list|remove`
-- `theme-manager version`
+- `chromacon-style-manager` — open the full-screen browser (default)
+- `chromacon-style-manager list` — list available themes
+- `chromacon-style-manager set <Theme>` — switch to a theme
+- `chromacon-style-manager set <Theme> -w` — switch theme and apply Waybar
+- `chromacon-style-manager set <Theme> -k` — switch theme and apply bundled Walker theme
+- `chromacon-style-manager set <Theme> --hyprlock` — switch theme and apply bundled Hyprlock theme
+- `chromacon-style-manager browse` — interactive selector (theme + Waybar + Walker + Hyprlock + Unlock + Starship)
+- `chromacon-style-manager waybar <mode>` — apply Waybar only
+- `chromacon-style-manager walker <mode>` — apply Walker only
+- `chromacon-style-manager hyprlock <mode>` — apply Hyprlock only
+- `chromacon-style-manager unlock list|set|reset` — list or apply Omarchy 3.7 boot unlock themes
+- `chromacon-style-manager starship <mode>` — apply Starship only
+- `chromacon-style-manager preset save|load|list|remove`
+- `chromacon-style-manager version`
 
 ---
 
@@ -145,7 +132,7 @@ Presets store a **theme + Waybar + Walker + Hyprlock + Starship** bundle.
 
 Save example:
 ```sh
-theme-manager preset save "Daily Driver" \
+chromacon-style-manager preset save "Daily Driver" \
   --theme noir \
   --waybar auto \
   --walker auto \
@@ -155,11 +142,11 @@ theme-manager preset save "Daily Driver" \
 
 Load example:
 ```sh
-theme-manager preset load "Daily Driver" -w
+chromacon-style-manager preset load "Daily Driver" -w
 # or override Walker too:
-theme-manager preset load "Daily Driver" -w -k omarchy-default
+chromacon-style-manager preset load "Daily Driver" -w -k omarchy-default
 # or override Hyprlock:
-theme-manager preset load "Daily Driver" --hyprlock omarchy-default
+chromacon-style-manager preset load "Daily Driver" --hyprlock omarchy-default
 ```
 
 **Precedence:**  
@@ -252,6 +239,7 @@ All checks are case-insensitive.
 - Apply: `Ctrl+Enter` (default)
 - Save preset: `Ctrl+S`
 - Clear search: `Ctrl+U`
+- Collapse/expand group: `Left`/`Right` (Theme, Waybar, Walker tabs — only shown when a group exists; put related themes in a subfolder to form a group)
 
 ### Ghostty users
 
@@ -303,7 +291,7 @@ Supported sources:
 
 Behavior:
 - Named Walker mode updates `~/.config/walker/config.toml` (`theme = "..."`)
-- Auto mode builds `theme-manager-auto` under `~/.config/walker/themes/`
+- Auto mode builds `cc-auto` under `~/.config/walker/themes/`
 - Walker is restarted after apply
 - If Omarchy default Walker files are found, `omarchy-default` is auto-linked into `~/.config/walker/themes/`
 
@@ -344,7 +332,7 @@ Behavior:
 
 ## Omarchy Compatibility
 
-Theme Manager Plus **calls Omarchy’s own scripts** to stay compatible.
+ChromaCon Style Manager **calls Omarchy’s own scripts** to stay compatible.
 
 Scripts invoked include:
 - `omarchy` grouped commands when available (Omarchy 3.7+)
@@ -400,7 +388,7 @@ Validation rules:
 Troubleshooting non-standard Omarchy layouts:
 - If your Omarchy root is not `~/.local/share/omarchy`, set `OMARCHY_PATH` explicitly.
 - If helper commands are installed in a custom bin location, set `OMARCHY_BIN_DIR`.
-- Use `theme-manager print-config` to verify resolved paths before applying themes.
+- Use `chromacon-style-manager print-config` to verify resolved paths before applying themes.
 - If `omarchy-default` is missing from tabs, confirm required module files exist at one of the supported paths above.
 
 ---
@@ -410,8 +398,8 @@ Troubleshooting non-standard Omarchy layouts:
 Configuration precedence:
 1. CLI flags
 2. Environment variables
-3. `./.theme-manager.toml`
-4. `~/.config/theme-manager/config.toml`
+3. `./.chromacon-style-manager.toml`
+4. `~/.config/chromacon-style-manager/config.toml`
 5. Defaults
 
 Example (`awww` transitions):
@@ -425,7 +413,7 @@ awww_transition_fps = 60
 
 Presets are stored in:
 ```
-~/.config/theme-manager/presets.toml
+~/.config/chromacon-style-manager/presets.toml
 ```
 
 ---

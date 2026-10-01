@@ -7,7 +7,7 @@ use crate::config::ResolvedConfig;
 use crate::omarchy::{RestartAction, RestartCommand};
 use crate::omarchy_defaults;
 use crate::omarchy_defaults::SymlinkEnsureResult;
-use crate::theme_ops::{CommandContext, WaybarMode};
+use crate::theme_ops::{self, CommandContext, WaybarMode};
 use walkdir::WalkDir;
 
 const WAYBAR_LINKS_FILE: &str = ".cc-style-waybar-links";
@@ -20,7 +20,7 @@ pub fn prepare_waybar(ctx: &CommandContext<'_>, theme_dir: &Path) -> Result<Opti
         WaybarMode::None => return Ok(None),
         WaybarMode::Auto => theme_dir.join("waybar-theme"),
         WaybarMode::Named => match &ctx.waybar_name {
-            Some(name) => ctx.config.waybar_themes_dir.join(name),
+            Some(name) => theme_ops::resolve_named_theme_dir(&ctx.config.waybar_themes_dir, name),
             None => return Ok(None),
         },
     };
